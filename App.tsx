@@ -4,12 +4,13 @@ import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { Dashboard } from './pages/Dashboard';
 import { Portfolio } from './pages/Portfolio';
-import { Proposals } from './pages/Proposals';
+import { Projects } from './pages/Projects';
 import { Auth } from './pages/Auth';
 import { Invoices } from './pages/Invoices';
 import { Profile } from './pages/Profile';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { ThemeProvider } from './context/ThemeContext';
 
 // Component to scroll top on route change
 const ScrollToTop = () => {
@@ -24,25 +25,27 @@ const ScrollToTop = () => {
 
 const App: React.FC = () => {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <Router>
-          <ScrollToTop />
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/portfolio" element={<Portfolio />} />
-              {/* Protected Routes would ideally have a wrapper, but simplistic here */}
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/proposals" element={<Proposals />} />
-              <Route path="/invoices" element={<Invoices />} />
-              <Route path="/profile" element={<Profile />} />
-            </Routes>
-          </Layout>
-        </Router>
-      </AuthProvider>
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <Router>
+            <ScrollToTop />
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/portfolio" element={<Portfolio />} />
+                {/* Protected Routes */}
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/projects" element={<Projects />} />
+                <Route path="/invoices" element={<Invoices />} />
+                <Route path="/profile" element={<Profile />} />
+              </Routes>
+            </Layout>
+          </Router>
+        </AuthProvider>
+      </ToastProvider>
+    </ThemeProvider>
   );
 };
 

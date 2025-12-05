@@ -1,4 +1,5 @@
 export type Role = 'admin' | 'client';
+export type Theme = 'dark' | 'light';
 
 export interface User {
   id: string;
@@ -10,23 +11,27 @@ export interface User {
   bio?: string;
   phone?: string;
   location?: string;
-  password?: string; // stored for mock auth purposes only
+  password?: string;
 }
 
 export interface Project {
   id: string;
   title: string;
-  client: string;
-  status: 'In Progress' | 'Completed' | 'Pending';
+  description?: string;
+  client: string; // Client Name
+  clientId: string; // User ID
+  status: 'Requested' | 'In Progress' | 'Completed' | 'Pending';
   progress: number;
   dueDate: string;
   budget: string;
-  image: string;
+  image?: string;
   tags: string[];
+  createdAt: string;
 }
 
 export interface Task {
   id: string;
+  projectId?: string;
   title: string;
   status: 'Todo' | 'In Progress' | 'Done';
   assignee: string;

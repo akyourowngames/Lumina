@@ -45,15 +45,15 @@ export const Profile = () => {
   return (
     <PageWrapper>
       <div className="max-w-4xl mx-auto px-6 pb-20">
-        <h1 className="text-3xl font-bold font-display mb-2">Profile Settings</h1>
-        <p className="text-gray-400 mb-8">Manage your account information and preferences.</p>
+        <h1 className="text-3xl font-bold font-display mb-2 text-slate-900 dark:text-white">Profile Settings</h1>
+        <p className="text-slate-600 dark:text-gray-400 mb-8">Manage your account information and preferences.</p>
 
         <div className="grid md:grid-cols-3 gap-8">
           {/* Sidebar - Avatar & Role */}
           <div className="md:col-span-1">
             <GlassCard className="text-center sticky top-24">
               <div className="relative inline-block mb-4 group">
-                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white/10 mx-auto">
+                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-200 dark:border-white/10 mx-auto">
                   <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                 </div>
                 <button className="absolute bottom-0 right-0 p-2 bg-primary rounded-full hover:bg-primary/80 transition-colors shadow-lg">
@@ -61,10 +61,10 @@ export const Profile = () => {
                 </button>
               </div>
               
-              <h2 className="text-xl font-bold mb-1">{user.name}</h2>
-              <p className="text-sm text-gray-400 uppercase tracking-widest font-medium text-xs mb-6">{user.role}</p>
+              <h2 className="text-xl font-bold mb-1 text-slate-900 dark:text-white">{user.name}</h2>
+              <p className="text-sm text-slate-500 dark:text-gray-400 uppercase tracking-widest font-medium text-xs mb-6">{user.role}</p>
               
-              <div className="flex flex-col gap-2 text-sm text-gray-400 text-left px-2">
+              <div className="flex flex-col gap-2 text-sm text-slate-600 dark:text-gray-400 text-left px-2">
                  <div className="flex items-center gap-2">
                     <Mail size={14} /> {user.email}
                  </div>
@@ -81,8 +81,8 @@ export const Profile = () => {
           <div className="md:col-span-2">
             <GlassCard>
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="flex justify-between items-center border-b border-white/10 pb-4 mb-6">
-                   <h3 className="font-bold text-lg">Personal Details</h3>
+                <div className="flex justify-between items-center border-b border-slate-200 dark:border-white/10 pb-4 mb-6">
+                   <h3 className="font-bold text-lg text-slate-900 dark:text-white">Personal Details</h3>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
@@ -122,13 +122,13 @@ export const Profile = () => {
                 </div>
 
                 <div>
-                   <label className="block text-xs font-medium text-gray-400 mb-1 ml-1">Bio</label>
+                   <label className="block text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 ml-1">Bio</label>
                    <textarea 
                       name="bio"
                       value={formData.bio}
                       onChange={handleChange}
                       rows={4}
-                      className="w-full bg-slate-900/50 border border-white/10 rounded-xl p-4 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-600 resize-none"
+                      className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400 resize-none"
                       placeholder="Tell us a little about yourself..."
                    />
                 </div>

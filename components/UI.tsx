@@ -8,10 +8,17 @@ export const GlassCard = ({ children, className = '', hoverEffect = true, onClic
       onClick={onClick}
       whileHover={hoverEffect ? { scale: 1.02 } : {}}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      className={`bg-glass backdrop-blur-xl border border-glassBorder rounded-2xl p-6 relative overflow-hidden group ${className}`}
+      className={`
+        bg-white/80 dark:bg-glass backdrop-blur-xl 
+        border border-slate-200 dark:border-glassBorder 
+        rounded-2xl p-6 relative overflow-hidden group 
+        shadow-lg dark:shadow-none
+        text-slate-900 dark:text-gray-100
+        ${className}
+      `}
     >
       {/* Background Gradient on Hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 dark:from-primary/10 dark:to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
       
       {/* Border Glow on Hover */}
       <div className="absolute inset-0 rounded-2xl border border-primary/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none box-border" />
@@ -36,10 +43,10 @@ export const Button = ({ children, variant = 'primary', className = '', isLoadin
   
   const variants = {
     primary: "bg-gradient-to-r from-primary to-secondary text-white shadow-lg shadow-primary/25 hover:shadow-primary/50 border border-transparent",
-    secondary: "bg-white text-dark hover:bg-gray-100 border border-transparent",
-    outline: "border border-white/20 hover:bg-white/5 text-white bg-transparent",
-    ghost: "bg-transparent hover:bg-white/5 text-gray-300 hover:text-white",
-    danger: "bg-red-500/10 text-red-400 border border-red-500/50 hover:bg-red-500/20"
+    secondary: "bg-slate-100 dark:bg-white text-slate-900 hover:bg-slate-200 dark:hover:bg-gray-100 border border-transparent",
+    outline: "border border-slate-300 dark:border-white/20 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-900 dark:text-white bg-transparent",
+    ghost: "bg-transparent hover:bg-slate-100 dark:hover:bg-white/5 text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white",
+    danger: "bg-red-500/10 text-red-500 dark:text-red-400 border border-red-500/50 hover:bg-red-500/20"
   };
 
   return (
@@ -65,11 +72,11 @@ export const Button = ({ children, variant = 'primary', className = '', isLoadin
 
 export const Badge = ({ children, color = 'blue' }: { children: React.ReactNode; color?: 'blue' | 'green' | 'red' | 'purple' | 'yellow' }) => {
   const colors = {
-    blue: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    green: 'bg-green-500/20 text-green-300 border-green-500/30',
-    red: 'bg-red-500/20 text-red-300 border-red-500/30',
-    purple: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-    yellow: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+    blue: 'bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 border-blue-500/30',
+    green: 'bg-green-500/10 dark:bg-green-500/20 text-green-600 dark:text-green-300 border-green-500/30',
+    red: 'bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-300 border-red-500/30',
+    purple: 'bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/30',
+    yellow: 'bg-yellow-500/10 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-300 border-yellow-500/30',
   };
 
   return (
@@ -140,25 +147,36 @@ export const PageWrapper = ({ children }: { children: React.ReactNode }) => (
   </motion.div>
 );
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends InputHTMLAttributes<HTMLInputElement | HTMLTextAreaElement> {
   label?: string;
   icon?: React.ReactNode;
+  textarea?: boolean;
 }
 
-export const Input = ({ label, icon, className = '', ...props }: InputProps) => {
+export const Input = ({ label, icon, className = '', textarea = false, ...props }: InputProps) => {
+  const baseInputStyles = `w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-xl py-3 ${icon ? 'pl-12' : 'pl-4'} pr-4 text-slate-900 dark:text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400 dark:placeholder:text-gray-600`;
+
   return (
     <div className={`relative ${className}`}>
-      {label && <label className="block text-xs font-medium text-gray-400 mb-1 ml-1">{label}</label>}
+      {label && <label className="block text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 ml-1">{label}</label>}
       <div className="relative group">
         {icon && (
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors">
+          <div className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-primary transition-colors">
             {icon}
           </div>
         )}
-        <input 
-          className={`w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 ${icon ? 'pl-12' : 'pl-4'} pr-4 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-600`}
-          {...props}
-        />
+        {textarea ? (
+          <textarea 
+            className={baseInputStyles}
+            rows={4}
+            {...(props as any)}
+          />
+        ) : (
+          <input 
+            className={baseInputStyles}
+            {...(props as any)}
+          />
+        )}
         <div className="absolute inset-0 rounded-xl bg-primary/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity" />
       </div>
     </div>

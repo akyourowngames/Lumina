@@ -15,7 +15,7 @@ export const Proposals = () => {
   return (
     <div className="max-w-7xl mx-auto px-6 pb-20">
       <div className="flex justify-between items-center mb-10">
-        <h1 className="text-3xl font-bold font-display">Proposals</h1>
+        <h1 className="text-3xl font-bold font-display text-slate-900 dark:text-white">Proposals</h1>
         <Button variant="outline" className="hidden sm:flex">+ Create New</Button>
       </div>
 
@@ -32,22 +32,22 @@ export const Proposals = () => {
             <GlassCard className="p-6 flex items-center justify-between group hover:border-primary/50 transition-colors">
               <div className="flex items-center gap-4">
                 <div className={`p-3 rounded-xl ${
-                    proposal.status === 'Signed' ? 'bg-green-500/20 text-green-400' : 
-                    proposal.status === 'Pending' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'
+                    proposal.status === 'Signed' ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 
+                    proposal.status === 'Pending' ? 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400' : 'bg-red-500/20 text-red-600 dark:text-red-400'
                 }`}>
                   <FileText size={24} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg group-hover:text-primary transition-colors">{proposal.title}</h3>
-                  <p className="text-gray-400 text-sm">for {proposal.client} • Created on {proposal.date}</p>
+                  <h3 className="font-bold text-lg group-hover:text-primary transition-colors text-slate-900 dark:text-white">{proposal.title}</h3>
+                  <p className="text-slate-500 dark:text-gray-400 text-sm">for {proposal.client} • Created on {proposal.date}</p>
                 </div>
               </div>
               <div className="flex items-center gap-6">
-                <span className="font-mono text-xl font-bold">{proposal.amount}</span>
+                <span className="font-mono text-xl font-bold text-slate-900 dark:text-white">{proposal.amount}</span>
                 <Badge color={proposal.status === 'Signed' ? 'green' : proposal.status === 'Pending' ? 'blue' : 'red'}>
                     {proposal.status}
                 </Badge>
-                <ChevronRight className="text-gray-500 group-hover:text-white transition-colors" />
+                <ChevronRight className="text-slate-400 dark:text-gray-500 group-hover:text-primary transition-colors" />
               </div>
             </GlassCard>
           </motion.div>
@@ -63,51 +63,51 @@ export const Proposals = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedProposal(null)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm"
             />
             <motion.div
               layoutId={`proposal-${selectedProposal}`}
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full max-w-4xl bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              className="relative w-full max-w-4xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
               {/* Header */}
-              <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-900/50">
+              <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
                 <div className="flex items-center gap-4">
                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center font-bold text-white">L</div>
                    <div>
-                      <h2 className="text-xl font-bold">Proposal #{selectedProposal}</h2>
-                      <p className="text-sm text-gray-400">Prepared for Acme Corp</p>
+                      <h2 className="text-xl font-bold text-slate-900 dark:text-white">Proposal #{selectedProposal}</h2>
+                      <p className="text-sm text-slate-500 dark:text-gray-400">Prepared for Acme Corp</p>
                    </div>
                 </div>
-                <button onClick={() => setSelectedProposal(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                <button onClick={() => setSelectedProposal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors text-slate-500 dark:text-gray-400">
                   <X />
                 </button>
               </div>
 
               {/* Body */}
-              <div className="p-8 overflow-y-auto custom-scrollbar bg-slate-950">
-                <div className="prose prose-invert max-w-none">
-                  <h3 className="text-2xl font-bold mb-4">Project Overview</h3>
-                  <p className="text-gray-300 mb-8">
+              <div className="p-8 overflow-y-auto custom-scrollbar bg-white dark:bg-slate-950">
+                <div className="prose prose-slate dark:prose-invert max-w-none">
+                  <h3 className="text-2xl font-bold mb-4 text-slate-900 dark:text-white">Project Overview</h3>
+                  <p className="text-slate-600 dark:text-gray-300 mb-8">
                     We are pleased to submit this proposal for the redesign of your core e-commerce platform. 
                     Our goal is to improve conversion rates by 25% through improved UX and faster load times via Next.js.
                   </p>
 
                   <div className="grid md:grid-cols-2 gap-6 mb-8">
-                     <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                     <div className="p-4 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5">
                         <h4 className="font-bold mb-2 text-primary">Deliverables</h4>
-                        <ul className="list-disc list-inside text-gray-400 space-y-1">
+                        <ul className="list-disc list-inside text-slate-600 dark:text-gray-400 space-y-1">
                            <li>High-fidelity Figma designs</li>
                            <li>Next.js Frontend Architecture</li>
                            <li>Stripe Payment Integration</li>
                            <li>Admin Dashboard</li>
                         </ul>
                      </div>
-                     <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                     <div className="p-4 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5">
                         <h4 className="font-bold mb-2 text-primary">Timeline</h4>
-                        <ul className="list-disc list-inside text-gray-400 space-y-1">
+                        <ul className="list-disc list-inside text-slate-600 dark:text-gray-400 space-y-1">
                            <li>Week 1-2: Design & Discovery</li>
                            <li>Week 3-6: Development</li>
                            <li>Week 7: QA & Testing</li>
@@ -116,30 +116,30 @@ export const Proposals = () => {
                      </div>
                   </div>
 
-                  <h3 className="text-2xl font-bold mb-4">Investment</h3>
-                  <div className="border border-white/10 rounded-xl overflow-hidden mb-8">
+                  <h3 className="text-2xl font-bold mb-4 text-slate-900 dark:text-white">Investment</h3>
+                  <div className="border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden mb-8">
                      <table className="w-full text-left">
-                        <thead className="bg-white/5">
+                        <thead className="bg-slate-50 dark:bg-white/5">
                            <tr>
-                              <th className="p-4 font-semibold">Item</th>
-                              <th className="p-4 font-semibold text-right">Cost</th>
+                              <th className="p-4 font-semibold text-slate-900 dark:text-white">Item</th>
+                              <th className="p-4 font-semibold text-right text-slate-900 dark:text-white">Cost</th>
                            </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-slate-200 dark:divide-white/5">
                            <tr>
-                              <td className="p-4 text-gray-300">UX/UI Design</td>
-                              <td className="p-4 text-right font-mono">$3,500</td>
+                              <td className="p-4 text-slate-600 dark:text-gray-300">UX/UI Design</td>
+                              <td className="p-4 text-right font-mono text-slate-900 dark:text-white">$3,500</td>
                            </tr>
                            <tr>
-                              <td className="p-4 text-gray-300">Frontend Development</td>
-                              <td className="p-4 text-right font-mono">$7,000</td>
+                              <td className="p-4 text-slate-600 dark:text-gray-300">Frontend Development</td>
+                              <td className="p-4 text-right font-mono text-slate-900 dark:text-white">$7,000</td>
                            </tr>
                            <tr>
-                              <td className="p-4 text-gray-300">Backend Integration</td>
-                              <td className="p-4 text-right font-mono">$2,000</td>
+                              <td className="p-4 text-slate-600 dark:text-gray-300">Backend Integration</td>
+                              <td className="p-4 text-right font-mono text-slate-900 dark:text-white">$2,000</td>
                            </tr>
                            <tr className="bg-primary/5">
-                              <td className="p-4 font-bold text-white">Total</td>
+                              <td className="p-4 font-bold text-slate-900 dark:text-white">Total</td>
                               <td className="p-4 text-right font-bold text-xl text-primary font-mono">$12,500</td>
                            </tr>
                         </tbody>
@@ -149,7 +149,7 @@ export const Proposals = () => {
               </div>
 
               {/* Footer Actions */}
-              <div className="p-6 border-t border-white/10 bg-slate-900 flex justify-between items-center">
+              <div className="p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 flex justify-between items-center">
                  <Button variant="outline" className="text-sm">
                     <Download size={16} /> Download PDF
                  </Button>

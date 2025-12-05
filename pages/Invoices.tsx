@@ -28,8 +28,8 @@ export const Invoices = () => {
       <div className="max-w-7xl mx-auto px-6 pb-20">
         <div className="flex justify-between items-center mb-10">
           <div>
-            <h1 className="text-3xl font-bold font-display">Invoices</h1>
-            <p className="text-gray-400">Manage payments and billing history.</p>
+            <h1 className="text-3xl font-bold font-display text-slate-900 dark:text-white">Invoices</h1>
+            <p className="text-slate-600 dark:text-gray-400">Manage payments and billing history.</p>
           </div>
           <Button>+ Create Invoice</Button>
         </div>
@@ -44,19 +44,19 @@ export const Invoices = () => {
             >
               <GlassCard className="p-6 flex flex-col md:flex-row items-center justify-between gap-4 group hover:border-primary/40 transition-colors">
                 <div className="flex items-center gap-6 w-full md:w-auto">
-                   <div className="p-4 bg-white/5 rounded-xl text-gray-400 group-hover:text-white transition-colors">
+                   <div className="p-4 bg-slate-100 dark:bg-white/5 rounded-xl text-slate-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-white transition-colors">
                       <FileText size={24} />
                    </div>
                    <div>
-                      <h3 className="font-bold text-lg">{invoice.invoiceNumber}</h3>
-                      <p className="text-gray-400 text-sm">{invoice.client} • Issued {invoice.date}</p>
+                      <h3 className="font-bold text-lg text-slate-900 dark:text-white">{invoice.invoiceNumber}</h3>
+                      <p className="text-slate-500 dark:text-gray-400 text-sm">{invoice.client} • Issued {invoice.date}</p>
                    </div>
                 </div>
 
                 <div className="flex items-center gap-8 w-full md:w-auto justify-between md:justify-end">
                    <div className="text-right">
-                      <p className="font-mono font-bold text-xl">{invoice.amount}</p>
-                      <p className="text-xs text-gray-500">Due {invoice.dueDate}</p>
+                      <p className="font-mono font-bold text-xl text-slate-900 dark:text-white">{invoice.amount}</p>
+                      <p className="text-xs text-slate-500 dark:text-gray-500">Due {invoice.dueDate}</p>
                    </div>
                    
                    <Badge color={
@@ -71,7 +71,7 @@ export const Invoices = () => {
                       </span>
                    </Badge>
 
-                   <button className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white">
+                   <button className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors text-slate-400 dark:text-gray-400 hover:text-primary dark:hover:text-white">
                       <Download size={20} />
                    </button>
                 </div>
