@@ -7,7 +7,9 @@ import { Portfolio } from './pages/Portfolio';
 import { Proposals } from './pages/Proposals';
 import { Auth } from './pages/Auth';
 import { Invoices } from './pages/Invoices';
+import { Profile } from './pages/Profile';
 import { AuthProvider } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 
 // Component to scroll top on route change
 const ScrollToTop = () => {
@@ -22,22 +24,25 @@ const ScrollToTop = () => {
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <Router>
-        <ScrollToTop />
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/portfolio" element={<Portfolio />} />
-            {/* Protected Routes would ideally have a wrapper, but simplistic here */}
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/proposals" element={<Proposals />} />
-            <Route path="/invoices" element={<Invoices />} />
-          </Routes>
-        </Layout>
-      </Router>
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <Router>
+          <ScrollToTop />
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/portfolio" element={<Portfolio />} />
+              {/* Protected Routes would ideally have a wrapper, but simplistic here */}
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/proposals" element={<Proposals />} />
+              <Route path="/invoices" element={<Invoices />} />
+              <Route path="/profile" element={<Profile />} />
+            </Routes>
+          </Layout>
+        </Router>
+      </AuthProvider>
+    </ToastProvider>
   );
 };
 

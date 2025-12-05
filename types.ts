@@ -7,6 +7,10 @@ export interface User {
   role: Role;
   avatar: string;
   company?: string;
+  bio?: string;
+  phone?: string;
+  location?: string;
+  password?: string; // stored for mock auth purposes only
 }
 
 export interface Project {

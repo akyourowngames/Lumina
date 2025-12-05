@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { InputHTMLAttributes } from 'react';
 import { motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 
 export const GlassCard = ({ children, className = '', hoverEffect = true, onClick }: { children: React.ReactNode; className?: string; hoverEffect?: boolean; onClick?: () => void }) => {
   return (
@@ -25,25 +26,39 @@ export const GlassCard = ({ children, className = '', hoverEffect = true, onClic
   );
 };
 
-export const Button = ({ children, variant = 'primary', onClick, className = '', type = 'button' }: { children: React.ReactNode; variant?: 'primary' | 'secondary' | 'outline' | 'ghost'; onClick?: () => void; className?: string; type?: 'button' | 'submit' | 'reset' }) => {
-  const baseClasses = "px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer";
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+  isLoading?: boolean;
+}
+
+export const Button = ({ children, variant = 'primary', className = '', isLoading, ...props }: ButtonProps) => {
+  const baseClasses = "relative px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden";
   
   const variants = {
     primary: "bg-gradient-to-r from-primary to-secondary text-white shadow-lg shadow-primary/25 hover:shadow-primary/50 border border-transparent",
     secondary: "bg-white text-dark hover:bg-gray-100 border border-transparent",
     outline: "border border-white/20 hover:bg-white/5 text-white bg-transparent",
-    ghost: "bg-transparent hover:bg-white/5 text-gray-300 hover:text-white"
+    ghost: "bg-transparent hover:bg-white/5 text-gray-300 hover:text-white",
+    danger: "bg-red-500/10 text-red-400 border border-red-500/50 hover:bg-red-500/20"
   };
 
   return (
     <motion.button
-      type={type}
-      whileTap={{ scale: 0.95 }}
-      whileHover={{ scale: 1.05 }}
-      onClick={onClick}
+      whileTap={{ scale: 0.96 }}
+      whileHover={{ scale: isLoading ? 1 : 1.02 }}
       className={`${baseClasses} ${variants[variant]} ${className}`}
+      disabled={isLoading || props.disabled}
+      {...props}
     >
-      {children}
+      <div className={`flex items-center gap-2 ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity`}>
+        {children}
+      </div>
+      
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Loader2 className="animate-spin text-current" size={20} />
+        </div>
+      )}
     </motion.button>
   );
 };
@@ -124,3 +139,28 @@ export const PageWrapper = ({ children }: { children: React.ReactNode }) => (
     {children}
   </motion.div>
 );
+
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
+  icon?: React.ReactNode;
+}
+
+export const Input = ({ label, icon, className = '', ...props }: InputProps) => {
+  return (
+    <div className={`relative ${className}`}>
+      {label && <label className="block text-xs font-medium text-gray-400 mb-1 ml-1">{label}</label>}
+      <div className="relative group">
+        {icon && (
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors">
+            {icon}
+          </div>
+        )}
+        <input 
+          className={`w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 ${icon ? 'pl-12' : 'pl-4'} pr-4 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-600`}
+          {...props}
+        />
+        <div className="absolute inset-0 rounded-xl bg-primary/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity" />
+      </div>
+    </div>
+  );
+};

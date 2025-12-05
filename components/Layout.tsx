@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, LayoutDashboard, FileText, Home, Sparkles, LogIn, LogOut, CreditCard } from 'lucide-react';
+import { Menu, X, LayoutDashboard, FileText, Home, Sparkles, LogIn, LogOut, CreditCard, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './UI';
 
@@ -79,11 +79,14 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
           <div className="hidden md:flex items-center gap-4">
             {user ? (
               <div className="flex items-center gap-4">
-                 <div className="flex items-center gap-2 text-sm text-gray-300">
-                    <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full border border-white/10" />
-                    <span>{user.name}</span>
-                 </div>
-                 <button onClick={handleLogout} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
+                 <Link to="/profile" className="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors group">
+                    <div className="relative">
+                      <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full border border-white/10 group-hover:border-primary transition-colors object-cover" />
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-950"></div>
+                    </div>
+                    <span className="font-medium">{user.name}</span>
+                 </Link>
+                 <button onClick={handleLogout} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors" title="Logout">
                     <LogOut size={20} />
                  </button>
               </div>
@@ -127,12 +130,21 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
               ))}
               <div className="h-px bg-white/10 my-2" />
               {user ? (
-                <button 
-                  onClick={handleLogout}
-                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-red-400 hover:text-red-300 w-full text-left"
-                >
-                  <LogOut size={18} /> Logout
-                </button>
+                <>
+                  <Link 
+                    to="/profile"
+                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-300 hover:text-white"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <User size={18} /> Profile
+                  </Link>
+                  <button 
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-red-400 hover:text-red-300 w-full text-left"
+                  >
+                    <LogOut size={18} /> Logout
+                  </button>
+                </>
               ) : (
                 <Link to="/auth" onClick={() => setIsMobileMenuOpen(false)}>
                   <Button className="w-full">Login</Button>

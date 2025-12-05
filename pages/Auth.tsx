@@ -1,27 +1,56 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { GlassCard, Button, AnimatedText, PageWrapper } from '../components/UI';
+import { GlassCard, Button, AnimatedText, PageWrapper, Input } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
-import { Lock, Mail, User, Briefcase, ArrowRight } from 'lucide-react';
+import { Lock, Mail, User, Briefcase, ArrowRight, Building2 } from 'lucide-react';
 
 export const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [role, setRole] = useState<'admin' | 'client'>('client');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const { login } = useAuth();
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    company: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const { login, signup } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(email, role);
-    navigate('/dashboard');
+    setIsSubmitting(true);
+    
+    let success = false;
+    
+    if (isLogin) {
+      success = await login(formData.email, role);
+    } else {
+      success = await signup({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role: role,
+        company: formData.company
+      });
+    }
+
+    if (success) {
+      navigate('/dashboard');
+    }
+    
+    setIsSubmitting(false);
   };
 
   return (
     <PageWrapper>
-      <div className="min-h-[80vh] flex items-center justify-center px-4">
+      <div className="min-h-[80vh] flex items-center justify-center px-4 py-10">
         <div className="max-w-4xl w-full grid md:grid-cols-2 gap-8 items-center">
           
           {/* Left Side - Info */}
@@ -38,7 +67,7 @@ export const Auth = () => {
             <div className="flex gap-4 mt-8">
               <div 
                 onClick={() => setRole('client')}
-                className={`cursor-pointer p-4 rounded-xl border transition-all ${role === 'client' ? 'bg-primary/20 border-primary' : 'bg-white/5 border-transparent hover:bg-white/10'}`}
+                className={`cursor-pointer p-4 rounded-xl border transition-all duration-300 w-1/2 ${role === 'client' ? 'bg-primary/20 border-primary shadow-[0_0_20px_rgba(99,102,241,0.2)]' : 'bg-white/5 border-transparent hover:bg-white/10'}`}
               >
                 <User className={`mb-2 ${role === 'client' ? 'text-primary' : 'text-gray-400'}`} />
                 <h3 className="font-bold text-sm">Client Portal</h3>
@@ -46,7 +75,7 @@ export const Auth = () => {
               </div>
               <div 
                 onClick={() => setRole('admin')}
-                className={`cursor-pointer p-4 rounded-xl border transition-all ${role === 'admin' ? 'bg-secondary/20 border-secondary' : 'bg-white/5 border-transparent hover:bg-white/10'}`}
+                className={`cursor-pointer p-4 rounded-xl border transition-all duration-300 w-1/2 ${role === 'admin' ? 'bg-secondary/20 border-secondary shadow-[0_0_20px_rgba(168,85,247,0.2)]' : 'bg-white/5 border-transparent hover:bg-white/10'}`}
               >
                 <Briefcase className={`mb-2 ${role === 'admin' ? 'text-secondary' : 'text-gray-400'}`} />
                 <h3 className="font-bold text-sm">Freelancer</h3>
@@ -86,45 +115,48 @@ export const Auth = () => {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
+                      className="space-y-4 overflow-hidden"
                     >
-                      <div className="relative">
-                        <User className="absolute left-4 top-3.5 text-gray-400" size={20} />
-                        <input 
-                          type="text" 
-                          placeholder="Full Name" 
-                          className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                        />
-                      </div>
+                      <Input 
+                        icon={<User size={20} />}
+                        placeholder="Full Name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        required={!isLogin}
+                      />
+                      <Input 
+                        icon={<Building2 size={20} />}
+                        placeholder="Company Name (Optional)"
+                        name="company"
+                        value={formData.company}
+                        onChange={handleChange}
+                      />
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                <div className="relative">
-                  <Mail className="absolute left-4 top-3.5 text-gray-400" size={20} />
-                  <input 
-                    type="email" 
-                    placeholder="Email Address" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                    required
-                  />
-                </div>
+                <Input 
+                  icon={<Mail size={20} />}
+                  type="email"
+                  placeholder="Email Address"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                />
 
-                <div className="relative">
-                  <Lock className="absolute left-4 top-3.5 text-gray-400" size={20} />
-                  <input 
-                    type="password" 
-                    placeholder="Password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                    required
-                  />
-                </div>
+                <Input 
+                  icon={<Lock size={20} />}
+                  type="password"
+                  placeholder="Password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                />
 
-                <Button className="w-full mt-6" type="submit">
+                <Button className="w-full mt-6" type="submit" isLoading={isSubmitting}>
                   {isLogin ? 'Log In' : 'Create Account'} <ArrowRight size={18} />
                 </Button>
               </form>
@@ -133,8 +165,8 @@ export const Auth = () => {
                 <p className="text-gray-400 text-sm">
                   {isLogin ? "Don't have an account? " : "Already have an account? "}
                   <button 
-                    onClick={() => setIsLogin(!isLogin)}
-                    className="text-primary hover:text-white font-medium transition-colors"
+                    onClick={() => { setIsLogin(!isLogin); setFormData({name: '', email: '', password: '', company: ''}); }}
+                    className="text-primary hover:text-white font-medium transition-colors underline decoration-transparent hover:decoration-primary"
                   >
                     {isLogin ? 'Sign Up' : 'Log In'}
                   </button>
