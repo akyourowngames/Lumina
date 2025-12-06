@@ -49,6 +49,7 @@ export interface ButtonProps extends HTMLMotionProps<"button"> {
   disabled?: boolean;
   type?: "button" | "submit" | "reset";
   onClick?: React.MouseEventHandler<HTMLButtonElement>;
+  title?: string;
 }
 
 export const Button = ({ children, variant = 'primary', className = '', isLoading, loaderSize = 20, disabled, ...props }: ButtonProps) => {

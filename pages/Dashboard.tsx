@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
 import { GlassCard, Badge, Button, PageWrapper, Input, Modal } from '../components/UI';
-import { Clock, CheckCircle2, DollarSign, TrendingUp, Users, FileText, Bell, Plus, X } from 'lucide-react';
+import { Clock, CheckCircle2, DollarSign, TrendingUp, Users, FileText, Bell, Plus, X, MessageSquare } from 'lucide-react';
 import { Task } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
@@ -101,7 +101,7 @@ export const Dashboard = () => {
     { label: "Total Revenue", val: "$12,450", icon: <DollarSign className="text-green-500 dark:text-green-400" />, change: "+12%" },
     { label: "Active Projects", val: "3", icon: <BriefcaseIcon className="text-blue-500 dark:text-blue-400" />, change: "+1", link: '/projects' },
     { label: "Pending Invoices", val: "2", icon: <Clock className="text-yellow-500 dark:text-yellow-400" />, change: "$4.5k", link: '/invoices' },
-    { label: "Total Leads", val: "28", icon: <Users className="text-purple-500 dark:text-purple-400" />, change: "+5" },
+    { label: "Messages", val: "5", icon: <MessageSquare className="text-purple-500 dark:text-purple-400" />, link: '/messages' },
   ];
 
   const clientStats: StatData[] = [
@@ -128,6 +128,12 @@ export const Dashboard = () => {
              <p className="text-slate-600 dark:text-gray-400">Welcome back, {user?.name}. Here's what's happening today.</p>
           </div>
           <div className="flex gap-3">
+            <Link to="/messages">
+               <Button variant="outline">
+                 <MessageSquare size={18} />
+                 <span className="hidden sm:inline">Messages</span>
+               </Button>
+            </Link>
             {!isAdmin && (
                <Link to="/projects">
                  <Button>View Projects</Button>
