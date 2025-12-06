@@ -1,16 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Role } from '../types';
-import { db } from '../services/mockDb';
 import { useToast } from './ToastContext';
-import { auth, googleProvider, firestore } from '../services/firebase';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signInWithPopup, 
-  signOut, 
-  onAuthStateChanged 
-} from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, googleProvider, firestore, timestamp } from '../services/firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -31,16 +22,16 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
   useEffect(() => {
     // This listener handles the initial load and any auth changes
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
         // ALWAYS use the real Firebase UID to ensure permissions match security rules
         const uid = firebaseUser.uid;
-        const userRef = doc(firestore, "users", uid);
+        const userRef = firestore.collection("users").doc(uid);
 
         try {
-          const userDoc = await getDoc(userRef);
+          const userDoc = await userRef.get();
 
-          if (userDoc.exists()) {
+          if (userDoc.exists) {
             // Document exists, use its data
             setUser(userDoc.data() as User);
           } else {
@@ -56,9 +47,9 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
             // Save to Firestore with server timestamp
             // Note: If permissions denied here, the catch block will handle it
-            await setDoc(userRef, {
+            await userRef.set({
               ...newUser,
-              createdAt: serverTimestamp()
+              createdAt: timestamp()
             });
 
             setUser(newUser);
@@ -85,6 +76,52 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
+  // Presence System
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const userRef = firestore.collection('users').doc(user.id);
+
+    // 1. Set Online
+    const setOnline = () => {
+        userRef.update({
+            isOnline: true,
+            lastSeen: timestamp()
+        }).catch(err => {
+            // Ignore errors (e.g., permissions during logout)
+        });
+    };
+
+    setOnline();
+
+    // 2. Heartbeat (every 30s)
+    const heartbeat = setInterval(() => {
+        userRef.update({
+            lastSeen: timestamp()
+        }).catch(console.error);
+    }, 30000);
+
+    // 3. Set Offline on cleanup
+    const setOffline = () => {
+        userRef.update({
+            isOnline: false,
+            lastSeen: timestamp()
+        }).catch(console.error);
+    };
+
+    // Handle tab close specifically
+    const handleTabClose = () => {
+        setOffline();
+    };
+    window.addEventListener('beforeunload', handleTabClose);
+
+    return () => {
+        clearInterval(heartbeat);
+        window.removeEventListener('beforeunload', handleTabClose);
+        setOffline();
+    };
+  }, [user?.id]);
+
   const login = async (email: string, role: Role, password?: string): Promise<boolean> => {
     if (!password) {
       showToast("Password is required", 'error');
@@ -93,7 +130,7 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
     
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await auth.signInWithEmailAndPassword(email, password);
       showToast("Logged in successfully!", 'success');
       return true;
     } catch (error: any) {
@@ -116,7 +153,7 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
     setIsLoading(true);
     try {
       // 1. Create Auth User
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const userCredential = await auth.createUserWithEmailAndPassword(data.email, data.password);
       const uid = userCredential.user.uid;
       
       const newUser: User = {
@@ -133,9 +170,9 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
       // 2. Save to Firestore (users/{uid})
       // We do this immediately so when the onAuthStateChanged fires, data might be ready
-      await setDoc(doc(firestore, "users", uid), {
+      await firestore.collection("users").doc(uid).set({
         ...newUser,
-        createdAt: serverTimestamp()
+        createdAt: timestamp()
       });
 
       // Update state immediately to avoid race condition flicker
@@ -158,17 +195,17 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
   const loginWithGoogle = async (role: Role): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      const result = await auth.signInWithPopup(googleProvider);
       const firebaseUser = result.user;
       const uid = firebaseUser.uid;
       
       // Check Firestore to see if we need to initialize this user with the chosen Role
-      const userDocRef = doc(firestore, "users", uid);
+      const userDocRef = firestore.collection("users").doc(uid);
       
       try {
-          const userDocSnap = await getDoc(userDocRef);
+          const userDocSnap = await userDocRef.get();
 
-          if (!userDocSnap.exists()) {
+          if (!userDocSnap.exists) {
             const newUser: User = {
                id: uid,
                name: firebaseUser.displayName || 'New User',
@@ -177,9 +214,9 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
                avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.email}`,
                company: '',
             };
-            await setDoc(userDocRef, {
+            await userDocRef.set({
               ...newUser,
-              createdAt: serverTimestamp()
+              createdAt: timestamp()
             });
             setUser(newUser);
           }
@@ -210,7 +247,7 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
     
     try {
        // Always write to the user's document based on their current ID
-       await setDoc(doc(firestore, "users", user.id), updatedUser, { merge: true });
+       await firestore.collection("users").doc(user.id).set(updatedUser, { merge: true });
        setUser(updatedUser);
        showToast("Profile updated successfully.", 'success');
        return true;
@@ -223,7 +260,7 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
   const logout = async () => {
     try {
-      await signOut(auth);
+      await auth.signOut();
       setUser(null); 
       showToast("Logged out successfully.", 'info');
     } catch (error) {

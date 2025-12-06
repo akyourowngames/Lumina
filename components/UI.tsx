@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, HTMLMotionProps, AnimatePresence, Variants } from 'framer-motion';
+import { motion, HTMLMotionProps, AnimatePresence } from 'framer-motion';
 import { Loader2, X } from 'lucide-react';
 
 export interface GlassCardProps extends HTMLMotionProps<"div"> {
@@ -108,7 +108,7 @@ export const Badge = ({ children, color = 'blue' }: BadgeProps) => {
 export const AnimatedText = ({ text, className = '' }: { text: string; className?: string }) => {
   const words = text.split(" ");
 
-  const container: Variants = {
+  const container: any = {
     hidden: { opacity: 0 },
     visible: (i = 1) => ({
       opacity: 1,
@@ -116,7 +116,7 @@ export const AnimatedText = ({ text, className = '' }: { text: string; className
     }),
   };
 
-  const child: Variants = {
+  const child: any = {
     visible: {
       opacity: 1,
       y: 0,

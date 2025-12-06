@@ -1,5 +1,7 @@
 {
   "name": "Lumina Freelance Portal",
   "description": "A high-conversion, animated freelancer portal featuring a public portfolio, client dashboard, Kanban project management, and proposal signing.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }

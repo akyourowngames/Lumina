@@ -6,8 +6,7 @@ import { Clock, CheckCircle2, DollarSign, TrendingUp, Users, FileText, Bell, Plu
 import { Task } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { collection, query, limit, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
-import { firestore } from '../services/firebase';
+import { firestore, timestamp } from '../services/firebase';
 import { useToast } from '../context/ToastContext';
 
 // Mock chart data (Dashboard charts usually aggregate data which requires more complex backend logic)
@@ -49,9 +48,8 @@ export const Dashboard = () => {
     const fetchTasks = async () => {
         if (!user) return;
         try {
-            // Removed orderBy to ensure all docs are returned, even if missing fields
-            const q = query(collection(firestore, 'users', user.id, 'tasks'), limit(10));
-            const snapshot = await getDocs(q);
+            const tasksRef = firestore.collection('users').doc(user.id).collection('tasks');
+            const snapshot = await tasksRef.limit(10).get();
             
             const fetchedTasks = snapshot.docs.map(d => {
                 const data = d.data();
@@ -82,12 +80,12 @@ export const Dashboard = () => {
     if (!user || !newTaskTitle) return;
 
     try {
-        await addDoc(collection(firestore, 'users', user.id, 'tasks'), {
+        await firestore.collection('users').doc(user.id).collection('tasks').add({
             title: newTaskTitle,
             status: 'Todo',
             priority: 'Medium',
             assignee: user.name,
-            createdAt: serverTimestamp()
+            createdAt: timestamp()
         });
         showToast("Task added!", "success");
         setIsTaskModalOpen(false);

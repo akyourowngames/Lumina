@@ -4,7 +4,6 @@ import { PageWrapper, Badge } from '../components/UI';
 import { ProjectChat } from '../components/ProjectChat';
 import { useAuth } from '../context/AuthContext';
 import { firestore } from '../services/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Project } from '../types';
 import { MessageSquare, Search, Briefcase, ChevronRight, ArrowLeft } from 'lucide-react';
 
@@ -21,18 +20,18 @@ export const Messages = () => {
       if (!user) return;
       setLoading(true);
       try {
-        const projectsRef = collection(firestore, 'projects');
+        const projectsRef = firestore.collection('projects');
         let q;
         
         // Fetch projects where user is owner OR freelancer
         if (user.role === 'client') {
-            q = query(projectsRef, where('ownerId', '==', user.id));
+            q = projectsRef.where('ownerId', '==', user.id);
         } else {
             // Freelancer sees assigned projects
-            q = query(projectsRef, where('freelancerId', '==', user.id));
+            q = projectsRef.where('freelancerId', '==', user.id);
         }
 
-        const snapshot = await getDocs(q);
+        const snapshot = await q.get();
         const fetchedProjects = snapshot.docs.map(d => {
             const data = d.data();
             return {

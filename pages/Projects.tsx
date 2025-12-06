@@ -5,8 +5,7 @@ import { Briefcase, ChevronRight, X, Calendar, DollarSign, Plus, Loader2, Send, 
 import { useAuth } from '../context/AuthContext';
 import { Project, Application } from '../types';
 import { useToast } from '../context/ToastContext';
-import { collection, addDoc, getDocs, updateDoc, doc, setDoc, serverTimestamp, query, where, onSnapshot } from 'firebase/firestore';
-import { firestore } from '../services/firebase';
+import { firestore, timestamp } from '../services/firebase';
 
 export const Projects = () => {
   const { user } = useAuth();
@@ -59,20 +58,20 @@ export const Projects = () => {
       if (!user) return;
       
       try {
-        const projectsRef = collection(firestore, "projects");
+        const projectsRef = firestore.collection("projects");
         let q;
 
         if (user.role === 'client') {
-            q = query(projectsRef, where("ownerId", "==", user.id));
+            q = projectsRef.where("ownerId", "==", user.id);
         } else {
             if (freelancerViewMode === 'mine') {
-                q = query(projectsRef, where("freelancerId", "==", user.id));
+                q = projectsRef.where("freelancerId", "==", user.id);
             } else {
-                q = query(projectsRef, where("status", "==", "Requested")); 
+                q = projectsRef.where("status", "==", "Requested"); 
             }
         }
 
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await q.get();
         
         const fetchedProjects: Project[] = querySnapshot.docs.map(doc => {
           const data = doc.data();
@@ -121,10 +120,9 @@ export const Projects = () => {
     
     setLoadingApps(true);
     
-    const appsRef = collection(firestore, "projects", selectedProject.id, "applications");
-    const q = query(appsRef);
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const appsRef = firestore.collection("projects").doc(selectedProject.id).collection("applications");
+    
+    const unsubscribe = appsRef.onSnapshot((snapshot) => {
         const apps = snapshot.docs.map(d => {
             const data = d.data();
             return {
@@ -161,9 +159,9 @@ export const Projects = () => {
 
     if (user) {
         try {
-            const appsRef = collection(firestore, "projects", project.id, "applications");
-            const q = query(appsRef, where("freelancerId", "==", user.id));
-            const snapshot = await getDocs(q);
+            const appsRef = firestore.collection("projects").doc(project.id).collection("applications");
+            const q = appsRef.where("freelancerId", "==", user.id);
+            const snapshot = await q.get();
             
             if (!snapshot.empty) {
                 setHasApplied(true);
@@ -187,15 +185,15 @@ export const Projects = () => {
 
     setIsApplying(true);
     try {
-        const appsRef = collection(firestore, "projects", projectToApply.id, "applications");
-        await addDoc(appsRef, {
+        const appsRef = firestore.collection("projects").doc(projectToApply.id).collection("applications");
+        await appsRef.add({
             freelancerId: user.id,
             freelancerName: user.name,
             projectId: projectToApply.id,
             message: applyForm.message,
             price: applyForm.price,
             status: 'applied',
-            createdAt: serverTimestamp()
+            createdAt: timestamp()
         });
         
         showToast("Application submitted successfully!", "success");
@@ -215,30 +213,30 @@ export const Projects = () => {
 
     try {
         // 1. Update Project
-        const projectRef = doc(firestore, "projects", selectedProject.id);
-        await updateDoc(projectRef, {
+        const projectRef = firestore.collection("projects").doc(selectedProject.id);
+        await projectRef.update({
             freelancerId: application.freelancerId,
             status: 'Assigned',
-            updatedAt: serverTimestamp()
+            updatedAt: timestamp()
         });
 
         // 2. Update Application Status
-        const appRef = doc(firestore, "projects", selectedProject.id, "applications", application.id);
-        await updateDoc(appRef, {
+        const appRef = firestore.collection("projects").doc(selectedProject.id).collection("applications").doc(application.id);
+        await appRef.update({
             status: 'accepted'
         });
 
         // 3. Create or Initialize Chat Room
         // Path: /chats/{projectId}
-        const chatRef = doc(firestore, "chats", selectedProject.id);
+        const chatRef = firestore.collection("chats").doc(selectedProject.id);
         const ownerId = selectedProject.ownerId || selectedProject.clientId;
         
-        await setDoc(chatRef, {
+        await chatRef.set({
             projectId: selectedProject.id,
             ownerId: ownerId,
             freelancerId: application.freelancerId,
             active: true,
-            createdAt: serverTimestamp(),
+            createdAt: timestamp(),
             closedAt: null,
             participants: [ownerId, application.freelancerId].filter(Boolean)
         }, { merge: true }); // Merge to avoid overwriting existing messages/history if any
@@ -265,9 +263,9 @@ export const Projects = () => {
     setIsSubmitting(true);
 
     try {
-      const projectsRef = collection(firestore, "projects");
+      const projectsRef = firestore.collection("projects");
       
-      await addDoc(projectsRef, {
+      await projectsRef.add({
         title: newProject.title,
         description: newProject.description,
         ownerId: user.id, 
@@ -277,8 +275,8 @@ export const Projects = () => {
         startDate: new Date().toISOString(),
         endDate: newProject.dueDate,
         budget: newProject.budget,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: timestamp(),
+        updatedAt: timestamp(),
         client: user.company || user.name, 
         tags: [] 
       });

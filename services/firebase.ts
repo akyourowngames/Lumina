@@ -1,8 +1,8 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getAnalytics } from "firebase/analytics";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import firebase from "firebase/compat/app";
+import "firebase/compat/auth";
+import "firebase/compat/firestore";
+import "firebase/compat/storage";
+import "firebase/compat/analytics";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC_TM0iaW9bFkU7mzsJ9jSE2Acywz-YWF0",
@@ -15,11 +15,17 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const analytics = getAnalytics(app);
-const firestore = getFirestore(app);
-const storage = getStorage(app);
-const googleProvider = new GoogleAuthProvider();
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 
-export { auth, googleProvider, analytics, firestore, storage };
+const auth = firebase.auth();
+const firestore = firebase.firestore();
+const storage = firebase.storage();
+const analytics = firebase.analytics();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+// Helper for server timestamp
+const timestamp = firebase.firestore.FieldValue.serverTimestamp;
+
+export { auth, googleProvider, analytics, firestore, storage, timestamp };
+export default firebase;

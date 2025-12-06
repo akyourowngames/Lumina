@@ -15,7 +15,8 @@
     "lucide-react": "^0.555.0",
     "react-router-dom": "^7.10.1",
     "recharts": "^3.5.1",
-    "firebase": "^12.6.0"
+    "firebase": "^12.6.0",
+    "@supabase/supabase-js": "2.45.4"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

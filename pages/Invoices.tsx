@@ -4,7 +4,6 @@ import { GlassCard, Button, Badge, PageWrapper } from '../components/UI';
 import { FileText, Download, CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { Invoice } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { collection, getDocs, query } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
 import { useToast } from '../context/ToastContext';
 
@@ -18,10 +17,9 @@ export const Invoices = () => {
     const fetchInvoices = async () => {
       if (!user) return;
       try {
-        const ref = collection(firestore, "users", user.id, "invoices");
+        const ref = firestore.collection("users").doc(user.id).collection("invoices");
         // Removed orderBy to prevent filtering
-        const q = query(ref); 
-        const snapshot = await getDocs(q);
+        const snapshot = await ref.get();
         
         const data = snapshot.docs.map(doc => {
             const d = doc.data();
