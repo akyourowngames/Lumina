@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
-import { GlassCard, Badge, Button, PageWrapper } from '../components/UI';
-import { Clock, CheckCircle2, DollarSign, TrendingUp, Users, FileText, Bell } from 'lucide-react';
+import { GlassCard, Badge, Button, PageWrapper, Input, Modal } from '../components/UI';
+import { Clock, CheckCircle2, DollarSign, TrendingUp, Users, FileText, Bell, Plus, X } from 'lucide-react';
 import { Task } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
+import { collection, query, limit, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { firestore } from '../services/firebase';
+import { useToast } from '../context/ToastContext';
 
+// Mock chart data (Dashboard charts usually aggregate data which requires more complex backend logic)
 const data = [
   { name: 'Jan', amt: 2400 },
   { name: 'Feb', amt: 1398 },
@@ -23,13 +27,6 @@ const clientData = [
   { name: 'Week 4', progress: 75 },
 ];
 
-const mockTasks: Task[] = [
-  { id: '1', title: 'Design Landing Page', status: 'Done', assignee: 'Alex', priority: 'High' },
-  { id: '2', title: 'Integrate Stripe API', status: 'In Progress', assignee: 'Alex', priority: 'High' },
-  { id: '3', title: 'Client Feedback Loop', status: 'Todo', assignee: 'Client', priority: 'Medium' },
-  { id: '4', title: 'Mobile Responsiveness', status: 'Todo', assignee: 'Alex', priority: 'Low' },
-];
-
 interface StatData {
   label: string;
   val: string;
@@ -40,6 +37,64 @@ interface StatData {
 export const Dashboard = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const { showToast } = useToast();
+  
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+
+  // Fetch Tasks
+  useEffect(() => {
+    const fetchTasks = async () => {
+        if (!user) return;
+        try {
+            // Removed orderBy to ensure all docs are returned, even if missing fields
+            const q = query(collection(firestore, 'users', user.id, 'tasks'), limit(10));
+            const snapshot = await getDocs(q);
+            
+            const fetchedTasks = snapshot.docs.map(d => {
+                const data = d.data();
+                return { 
+                    id: d.id, 
+                    title: data.title || 'Untitled',
+                    status: data.status || 'Todo',
+                    priority: data.priority || 'Medium',
+                    assignee: data.assignee || 'Unassigned',
+                    // Handle missing or string timestamps
+                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || data.createdat || new Date().toISOString())
+                } as unknown as Task & { createdAt: string };
+            });
+
+            // Client side sort
+            fetchedTasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+            setTasks(fetchedTasks.slice(0, 5));
+        } catch (e) {
+            console.error(e);
+        }
+    };
+    fetchTasks();
+  }, [user, isTaskModalOpen]);
+
+  const handleAddTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !newTaskTitle) return;
+
+    try {
+        await addDoc(collection(firestore, 'users', user.id, 'tasks'), {
+            title: newTaskTitle,
+            status: 'Todo',
+            priority: 'Medium',
+            assignee: user.name,
+            createdAt: serverTimestamp()
+        });
+        showToast("Task added!", "success");
+        setIsTaskModalOpen(false);
+        setNewTaskTitle('');
+    } catch (e) {
+        showToast("Failed to add task", "error");
+    }
+  };
 
   const adminStats: StatData[] = [
     { label: "Total Revenue", val: "$12,450", icon: <DollarSign className="text-green-500 dark:text-green-400" />, change: "+12%" },
@@ -50,7 +105,7 @@ export const Dashboard = () => {
 
   const clientStats: StatData[] = [
     { label: "Project Status", val: "On Track", icon: <TrendingUp className="text-green-500 dark:text-green-400" /> },
-    { label: "Pending Tasks", val: "3", icon: <CheckCircle2 className="text-blue-500 dark:text-blue-400" /> },
+    { label: "Pending Tasks", val: tasks.filter(t => t.status !== 'Done').length.toString(), icon: <CheckCircle2 className="text-blue-500 dark:text-blue-400" /> },
     { label: "Next Invoice", val: "$2,500", icon: <FileText className="text-yellow-500 dark:text-yellow-400" /> },
     { label: "Unread Messages", val: "1", icon: <Bell className="text-purple-500 dark:text-purple-400" /> },
   ];
@@ -151,9 +206,16 @@ export const Dashboard = () => {
           {/* Side Panel (Tasks) */}
           <div className="lg:col-span-1">
             <GlassCard className="h-full">
-              <h2 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">{isAdmin ? 'Recent Tasks' : 'Upcoming Milestones'}</h2>
+              <div className="flex justify-between items-center mb-6">
+                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">Recent Tasks</h2>
+                 <button onClick={() => setIsTaskModalOpen(true)} className="p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded">
+                    <Plus size={18} />
+                 </button>
+              </div>
+              
               <div className="space-y-4">
-                {mockTasks.map((task, i) => (
+                {tasks.length === 0 && <p className="text-sm text-gray-500">No tasks found. Add one!</p>}
+                {tasks.map((task, i) => (
                   <motion.div
                     key={task.id}
                     initial={{ opacity: 0, x: 20 }}
@@ -170,7 +232,7 @@ export const Dashboard = () => {
                     <div className="flex justify-between items-center text-xs text-slate-500 dark:text-gray-400">
                       <div className="flex items-center gap-2">
                         <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-[10px] text-white font-bold">
-                          {task.assignee.charAt(0)}
+                          {task.assignee?.charAt(0) || 'U'}
                         </div>
                         <span>{task.assignee}</span>
                       </div>
@@ -189,6 +251,30 @@ export const Dashboard = () => {
             </GlassCard>
           </div>
         </div>
+
+        {/* Add Task Modal */}
+        <Modal 
+            isOpen={isTaskModalOpen} 
+            onClose={() => setIsTaskModalOpen(false)}
+            title="Add Quick Task"
+            maxWidth="max-w-sm"
+        >
+            <div className="p-6">
+                <form onSubmit={handleAddTask} className="space-y-4">
+                    <Input 
+                        autoFocus
+                        placeholder="Task Title" 
+                        value={newTaskTitle} 
+                        onChange={e => setNewTaskTitle(e.target.value)} 
+                    />
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={() => setIsTaskModalOpen(false)}>Cancel</Button>
+                        <Button type="submit">Add Task</Button>
+                    </div>
+                </form>
+            </div>
+        </Modal>
+
       </div>
     </PageWrapper>
   );

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GlassCard, Button, Badge } from '../components/UI';
+import { GlassCard, Button, Badge, Modal } from '../components/UI';
 import { FileText, CheckCircle, Download, CreditCard, ChevronRight, X } from 'lucide-react';
 
 const mockProposals = [
@@ -55,39 +55,16 @@ export const Proposals = () => {
       </div>
 
       {/* Modal View for Proposal Details */}
-      <AnimatePresence>
-        {selectedProposal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedProposal(null)}
-              className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm"
-            />
-            <motion.div
-              layoutId={`proposal-${selectedProposal}`}
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full max-w-4xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
-            >
-              {/* Header */}
-              <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
-                <div className="flex items-center gap-4">
-                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center font-bold text-white">L</div>
-                   <div>
-                      <h2 className="text-xl font-bold text-slate-900 dark:text-white">Proposal #{selectedProposal}</h2>
-                      <p className="text-sm text-slate-500 dark:text-gray-400">Prepared for Acme Corp</p>
-                   </div>
-                </div>
-                <button onClick={() => setSelectedProposal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors text-slate-500 dark:text-gray-400">
-                  <X />
-                </button>
-              </div>
-
+      <Modal
+        isOpen={!!selectedProposal}
+        onClose={() => setSelectedProposal(null)}
+        title={selectedProposal ? `Proposal #${selectedProposal}` : ''}
+        maxWidth="max-w-4xl"
+      >
+          {selectedProposal && (
+            <>
               {/* Body */}
-              <div className="p-8 overflow-y-auto custom-scrollbar bg-white dark:bg-slate-950">
+              <div className="p-8 bg-white dark:bg-slate-950">
                 <div className="prose prose-slate dark:prose-invert max-w-none">
                   <h3 className="text-2xl font-bold mb-4 text-slate-900 dark:text-white">Project Overview</h3>
                   <p className="text-slate-600 dark:text-gray-300 mb-8">
@@ -149,7 +126,7 @@ export const Proposals = () => {
               </div>
 
               {/* Footer Actions */}
-              <div className="p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 flex justify-between items-center">
+              <div className="p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 flex justify-between items-center sticky bottom-0 z-10">
                  <Button variant="outline" className="text-sm">
                     <Download size={16} /> Download PDF
                  </Button>
@@ -160,11 +137,9 @@ export const Proposals = () => {
                     </Button>
                  </div>
               </div>
-
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            </>
+          )}
+      </Modal>
     </div>
   );
 };

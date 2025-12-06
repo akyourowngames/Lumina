@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { GlassCard, Button, AnimatedText, PageWrapper, Input } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
 import { Lock, Mail, User, Briefcase, ArrowRight, Building2 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 // Google Icon Component
 const GoogleIcon = () => (
@@ -40,6 +41,7 @@ export const Auth = () => {
   
   const { login, signup, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -49,25 +51,29 @@ export const Auth = () => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    let success = false;
-    
-    if (isLogin) {
-      success = await login(formData.email, role, formData.password);
-    } else {
-      success = await signup({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        role: role,
-        company: formData.company
-      });
-    }
+    try {
+      let success = false;
+      
+      if (isLogin) {
+        success = await login(formData.email, role, formData.password);
+      } else {
+        success = await signup({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role: role,
+          company: formData.company
+        });
+      }
 
-    if (success) {
-      navigate('/dashboard');
+      if (success) {
+        navigate('/dashboard');
+      }
+    } catch (error: any) {
+        // This catch block is just a safety net, error handling is mostly in AuthContext
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    setIsSubmitting(false);
   };
 
   const handleGoogleSignIn = async () => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { GlassCard, Button, PageWrapper, Input } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
-import { User as UserIcon, Mail, Building2, MapPin, Phone, Camera, Save } from 'lucide-react';
+import { User as UserIcon, Mail, Building2, MapPin, Phone, Camera, Save, Link as LinkIcon } from 'lucide-react';
 
 export const Profile = () => {
   const { user, updateProfile } = useAuth();
@@ -12,7 +12,8 @@ export const Profile = () => {
     company: '',
     bio: '',
     phone: '',
-    location: ''
+    location: '',
+    avatar: ''
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -24,7 +25,8 @@ export const Profile = () => {
         company: user.company || '',
         bio: user.bio || '',
         phone: user.phone || '',
-        location: user.location || ''
+        location: user.location || '',
+        avatar: user.avatar || ''
       });
     }
   }, [user]);
@@ -53,10 +55,15 @@ export const Profile = () => {
           <div className="md:col-span-1">
             <GlassCard className="text-center sticky top-24">
               <div className="relative inline-block mb-4 group">
-                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-200 dark:border-white/10 mx-auto">
-                  <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-200 dark:border-white/10 mx-auto bg-slate-100 dark:bg-slate-800">
+                  <img src={formData.avatar || user.avatar} alt={user.name} className="w-full h-full object-cover" />
                 </div>
-                <button className="absolute bottom-0 right-0 p-2 bg-primary rounded-full hover:bg-primary/80 transition-colors shadow-lg">
+                {/* Clicking camera focuses the avatar input */}
+                <button 
+                  type="button"
+                  onClick={() => document.getElementById('avatar-input')?.focus()}
+                  className="absolute bottom-0 right-0 p-2 bg-primary rounded-full hover:bg-primary/80 transition-colors shadow-lg cursor-pointer"
+                >
                   <Camera size={16} className="text-white" />
                 </button>
               </div>
@@ -94,15 +101,23 @@ export const Profile = () => {
                       onChange={handleChange}
                    />
                    <Input 
+                      label="Email Address"
+                      icon={<Mail size={18} />}
+                      name="email"
+                      value={formData.email}
+                      disabled
+                      className="opacity-70 cursor-not-allowed"
+                   />
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                   <Input 
                       label="Company"
                       icon={<Building2 size={18} />}
                       name="company"
                       value={formData.company}
                       onChange={handleChange}
                    />
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
                    <Input 
                       label="Phone Number"
                       icon={<Phone size={18} />}
@@ -111,6 +126,9 @@ export const Profile = () => {
                       onChange={handleChange}
                       placeholder="+1 (555) 000-0000"
                    />
+                </div>
+                
+                <div className="grid md:grid-cols-2 gap-6">
                    <Input 
                       label="Location"
                       icon={<MapPin size={18} />}
@@ -118,6 +136,15 @@ export const Profile = () => {
                       value={formData.location}
                       onChange={handleChange}
                       placeholder="City, Country"
+                   />
+                   <Input 
+                      id="avatar-input"
+                      label="Avatar URL"
+                      icon={<LinkIcon size={18} />}
+                      name="avatar"
+                      value={formData.avatar}
+                      onChange={handleChange}
+                      placeholder="https://..."
                    />
                 </div>
 

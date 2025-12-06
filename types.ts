@@ -1,3 +1,5 @@
+import React from 'react';
+
 export type Role = 'admin' | 'client';
 export type Theme = 'dark' | 'light';
 
@@ -18,14 +20,30 @@ export interface Project {
   id: string;
   title: string;
   description?: string;
-  client: string; // Client Name
-  clientId: string; // User ID
-  status: 'Requested' | 'In Progress' | 'Completed' | 'Pending';
+  client: string; // Client Name (for display)
+  clientId: string; // User ID (Mapped from ownerId)
+  ownerId?: string; // New: owner of the project
+  freelancerId?: string | null; // New: assigned freelancer
+  status: 'Requested' | 'In Progress' | 'Completed' | 'Pending' | 'Assigned';
   progress: number;
-  dueDate: string;
+  dueDate: string; // Mapped from endDate for UI compat
+  endDate?: string; // New schema field
+  startDate?: string; // New schema field
   budget: string;
   image?: string;
   tags: string[];
+  createdAt: string;
+  updatedAt?: string; // New schema field
+}
+
+export interface Application {
+  id: string;
+  projectId: string;
+  freelancerId: string;
+  freelancerName: string;
+  message: string;
+  price: string;
+  status: 'applied' | 'accepted' | 'rejected';
   createdAt: string;
 }
 

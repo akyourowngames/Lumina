@@ -6,7 +6,14 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Button } from './UI';
 
-const NavLink = ({ to, icon, text, isActive }: { to: string; icon: React.ReactNode; text: string; isActive: boolean }) => (
+interface NavLinkProps {
+  to: string;
+  icon: React.ReactNode;
+  text: string;
+  isActive: boolean;
+}
+
+const NavLink: React.FC<NavLinkProps> = ({ to, icon, text, isActive }) => (
   <Link to={to} className="relative group">
     <div className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${isActive ? 'text-slate-900 dark:text-white font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white'}`}>
       {icon}
@@ -22,7 +29,7 @@ const NavLink = ({ to, icon, text, isActive }: { to: string; icon: React.ReactNo
   </Link>
 );
 
-export const Layout = ({ children }: { children: React.ReactNode }) => {
+export const Layout = ({ children }: { children?: React.ReactNode }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();

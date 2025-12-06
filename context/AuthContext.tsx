@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Role } from '../types';
 import { db } from '../services/mockDb';
 import { useToast } from './ToastContext';
@@ -10,7 +10,7 @@ import {
   signOut, 
   onAuthStateChanged 
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -24,52 +24,60 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export const AuthProvider = ({ children }: { children?: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { showToast } = useToast();
 
   useEffect(() => {
+    // This listener handles the initial load and any auth changes
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // First try to get from Firestore to get the correct Role
+        // ALWAYS use the real Firebase UID to ensure permissions match security rules
+        const uid = firebaseUser.uid;
+        const userRef = doc(firestore, "users", uid);
+
         try {
-          const userDoc = await getDoc(doc(firestore, "users", firebaseUser.uid));
+          const userDoc = await getDoc(userRef);
+
           if (userDoc.exists()) {
+            // Document exists, use its data
             setUser(userDoc.data() as User);
-            
-            // Sync to local mockDB for compatibility
-            if (!db.getUsers().find(u => u.id === firebaseUser.uid)) {
-               db.createUser(userDoc.data() as User);
-            }
           } else {
-            // Fallback to local DB or basic info if not in Firestore yet
-            // This happens if creation is laggy or failed
-            let localUser = db.getUsers().find(u => u.email === firebaseUser.email);
-            if (localUser) {
-               setUser(localUser);
-            } else {
-               const newUser: User = {
-                 id: firebaseUser.uid,
-                 name: firebaseUser.displayName || 'New User',
-                 email: firebaseUser.email || '',
-                 role: 'client', // Default fallback
-                 avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.email}`,
-                 company: '',
-                 bio: ''
-               };
-               setUser(newUser);
-            }
+            // Document missing? Create it automatically.
+            const newUser: User = {
+              id: uid, // CRITICAL: Must use firebaseUser.uid
+              name: firebaseUser.displayName || 'New User',
+              email: firebaseUser.email || '',
+              role: 'client', // Default to client if unknown
+              avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.email}`,
+              company: '',
+            };
+
+            // Save to Firestore with server timestamp
+            // Note: If permissions denied here, the catch block will handle it
+            await setDoc(userRef, {
+              ...newUser,
+              createdAt: serverTimestamp()
+            });
+
+            setUser(newUser);
           }
-        } catch (e) {
-          console.error("Error fetching user from Firestore", e);
-          // Fallback
-          let localUser = db.getUsers().find(u => u.email === firebaseUser.email);
-          setUser(localUser || null);
+        } catch (error: any) {
+          // If we get a permission error, it means the user exists in Auth but rules block Firestore.
+          // We fallback to basic Auth info so the app is still usable.
+          console.warn("Could not fetch full user profile (likely permissions):", error.code);
+          
+          setUser({
+            id: uid,
+            name: firebaseUser.displayName || 'User',
+            email: firebaseUser.email || '',
+            role: 'client',
+            avatar: firebaseUser.photoURL || '',
+          } as User);
         }
       } else {
-        // Only clear user if we are not in a forced demo session (checked via ID)
-        setUser(prev => prev && prev.id.startsWith('demo-') ? prev : null);
+        setUser(null);
       }
       setIsLoading(false);
     });
@@ -89,8 +97,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       showToast("Logged in successfully!", 'success');
       return true;
     } catch (error: any) {
-      console.error("Login Error:", error);
-      showToast(error.message || "Failed to login.", 'error');
+      console.error("Login Error:", error.code);
+      
+      if (error.code === 'auth/invalid-credential') {
+          showToast("User not found or wrong password. Please Sign Up if you don't have an account.", 'error');
+      } else {
+          showToast(error.message || "Failed to login.", 'error');
+      }
+      
       setIsLoading(false);
       return false;
     }
@@ -101,10 +115,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     setIsLoading(true);
     try {
+      // 1. Create Auth User
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const uid = userCredential.user.uid;
       
       const newUser: User = {
-        id: userCredential.user.uid,
+        id: uid,
         name: data.name || 'New User',
         email: data.email,
         role: data.role || 'client',
@@ -113,18 +129,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         ...data
       };
       
-      // Remove password before saving to DB
       delete newUser.password;
 
-      // 1. Save to Firestore
-      try {
-        await setDoc(doc(firestore, "users", newUser.id), newUser);
-      } catch (firestoreError) {
-        console.error("Error saving to Firestore:", firestoreError);
-      }
+      // 2. Save to Firestore (users/{uid})
+      // We do this immediately so when the onAuthStateChanged fires, data might be ready
+      await setDoc(doc(firestore, "users", uid), {
+        ...newUser,
+        createdAt: serverTimestamp()
+      });
 
-      // 2. Save to Mock DB (for app compatibility)
-      db.createUser(newUser);
+      // Update state immediately to avoid race condition flicker
+      setUser(newUser);
       
       showToast("Account created successfully!", 'success');
       return true;
@@ -145,25 +160,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const firebaseUser = result.user;
+      const uid = firebaseUser.uid;
       
-      // Check Firestore if user exists
-      const userDocRef = doc(firestore, "users", firebaseUser.uid);
-      const userDocSnap = await getDoc(userDocRef);
+      // Check Firestore to see if we need to initialize this user with the chosen Role
+      const userDocRef = doc(firestore, "users", uid);
+      
+      try {
+          const userDocSnap = await getDoc(userDocRef);
 
-      if (!userDocSnap.exists()) {
-        // Create new user in Firestore
-        const newUser: User = {
-           id: firebaseUser.uid,
-           name: firebaseUser.displayName || 'New User',
-           email: firebaseUser.email || '',
-           role: role, // Use the role selected in the UI for first time signup
-           avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.email}`,
-           company: '',
-        };
-        await setDoc(userDocRef, newUser);
-
-        // Also add to MockDB
-        db.createUser(newUser);
+          if (!userDocSnap.exists()) {
+            const newUser: User = {
+               id: uid,
+               name: firebaseUser.displayName || 'New User',
+               email: firebaseUser.email || '',
+               role: role, // Use the role selected in the UI
+               avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.email}`,
+               company: '',
+            };
+            await setDoc(userDocRef, {
+              ...newUser,
+              createdAt: serverTimestamp()
+            });
+            setUser(newUser);
+          }
+      } catch (e) {
+          // Ignore permission errors on google sign in fetch, handled by onAuthStateChanged fallback
+          console.warn("Google Sign In: Firestore check failed, proceeding with auth only.");
       }
       
       showToast("Logged in with Google!", 'success');
@@ -171,41 +193,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error: any) {
       console.error("Google Sign In Error:", error);
       
-      const errorCode = error.code;
-      const errorMessage = error.message || '';
-
-      // Fallback for unauthorized domains (Preview Environments)
-      if (
-        errorCode === 'auth/unauthorized-domain' || 
-        errorCode === 'auth/operation-not-allowed' ||
-        errorMessage.includes('unauthorized-domain')
-      ) {
-        const mockUser: User = {
-          id: 'demo-user-google',
-          name: 'Demo User',
-          email: 'demo@lumina.app',
-          role: role,
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=demo`,
-          company: 'Demo Company',
-          bio: 'This is a demo account because the preview domain is not authorized in Firebase.'
-        };
-        
-        // Ensure user is in local DB so we can persist their edits in this session
-        const existing = db.getUsers().find(u => u.id === mockUser.id);
-        if (!existing) {
-           db.createUser(mockUser);
-        }
-        
-        setUser(mockUser);
-        showToast(`Demo Mode: Domain not authorized in Firebase. Logged in as ${role}.`, 'info');
-        setIsLoading(false);
-        return true;
-      }
-
-      if (errorCode === 'auth/popup-closed-by-user') {
+      if (error.code === 'auth/popup-closed-by-user') {
         showToast("Sign in cancelled.", 'info');
       } else {
-        showToast(errorMessage || "Google sign in failed.", 'error');
+        showToast(error.message || "Google sign in failed.", 'error');
       }
       setIsLoading(false);
       return false;
@@ -217,25 +208,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     const updatedUser = { ...user, ...data };
     
-    // Update Firestore
-    if (!user.id.startsWith('demo-')) {
-       try {
-         await setDoc(doc(firestore, "users", user.id), updatedUser, { merge: true });
-       } catch (e) {
-         console.error("Error updating Firestore:", e);
-       }
+    try {
+       // Always write to the user's document based on their current ID
+       await setDoc(doc(firestore, "users", user.id), updatedUser, { merge: true });
+       setUser(updatedUser);
+       showToast("Profile updated successfully.", 'success');
+       return true;
+    } catch (e: any) {
+       console.error("Error updating Firestore:", e);
+       showToast("Failed to update profile.", 'error');
+       return false;
     }
-
-    db.updateUser(updatedUser);
-    setUser(updatedUser);
-    showToast("Profile updated successfully.", 'success');
-    return true;
   };
 
   const logout = async () => {
     try {
       await signOut(auth);
-      // Force clear user in case we were in mock mode
       setUser(null); 
       showToast("Logged out successfully.", 'info');
     } catch (error) {

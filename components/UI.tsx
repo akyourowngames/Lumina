@@ -1,8 +1,15 @@
-import React, { InputHTMLAttributes } from 'react';
-import { motion } from 'framer-motion';
-import { Loader2 } from 'lucide-react';
+import React from 'react';
+import { motion, HTMLMotionProps, AnimatePresence } from 'framer-motion';
+import { Loader2, X } from 'lucide-react';
 
-export const GlassCard = ({ children, className = '', hoverEffect = true, onClick }: { children: React.ReactNode; className?: string; hoverEffect?: boolean; onClick?: () => void }) => {
+export interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
+  children?: React.ReactNode;
+  className?: string;
+  hoverEffect?: boolean;
+  onClick?: () => void;
+}
+
+export const GlassCard = ({ children, className = '', hoverEffect = true, onClick, ...props }: GlassCardProps) => {
   return (
     <motion.div
       onClick={onClick}
@@ -16,27 +23,29 @@ export const GlassCard = ({ children, className = '', hoverEffect = true, onClic
         text-slate-900 dark:text-gray-100
         ${className}
       `}
+      {...props}
     >
       {/* Background Gradient on Hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 dark:from-primary/10 dark:to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 dark:from-primary/10 dark:to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
       
       {/* Border Glow on Hover */}
       <div className="absolute inset-0 rounded-2xl border border-primary/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none box-border" />
       
       {/* Top Highlight Line */}
-      <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-50 group-hover:opacity-100 group-hover:h-[2px] group-hover:shadow-[0_0_15px_rgba(99,102,241,0.6)] transition-all duration-500" />
+      <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-50 group-hover:opacity-100 group-hover:h-[2px] group-hover:shadow-[0_0_15px_rgba(99,102,241,0.6)] transition-all duration-500 pointer-events-none" />
 
-      <div className="relative z-10">
-        {children}
-      </div>
+      {/* Children rendered directly to respect flex container styles on the parent */}
+      {children}
     </motion.div>
   );
 };
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export type ButtonProps = React.ComponentProps<'button'> & {
+  children?: React.ReactNode;
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
   isLoading?: boolean;
-}
+  className?: string;
+};
 
 export const Button = ({ children, variant = 'primary', className = '', isLoading, ...props }: ButtonProps) => {
   const baseClasses = "relative px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden";
@@ -55,7 +64,7 @@ export const Button = ({ children, variant = 'primary', className = '', isLoadin
       whileHover={{ scale: isLoading ? 1 : 1.02 }}
       className={`${baseClasses} ${variants[variant]} ${className}`}
       disabled={isLoading || props.disabled}
-      {...props}
+      {...(props as HTMLMotionProps<"button">)}
     >
       <div className={`flex items-center gap-2 ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity`}>
         {children}
@@ -70,7 +79,12 @@ export const Button = ({ children, variant = 'primary', className = '', isLoadin
   );
 };
 
-export const Badge = ({ children, color = 'blue' }: { children: React.ReactNode; color?: 'blue' | 'green' | 'red' | 'purple' | 'yellow' }) => {
+export interface BadgeProps {
+  children?: React.ReactNode;
+  color?: 'blue' | 'green' | 'red' | 'purple' | 'yellow';
+}
+
+export const Badge = ({ children, color = 'blue' }: BadgeProps) => {
   const colors = {
     blue: 'bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 border-blue-500/30',
     green: 'bg-green-500/10 dark:bg-green-500/20 text-green-600 dark:text-green-300 border-green-500/30',
@@ -136,7 +150,7 @@ export const AnimatedText = ({ text, className = '' }: { text: string; className
   );
 };
 
-export const PageWrapper = ({ children }: { children: React.ReactNode }) => (
+export const PageWrapper = ({ children }: { children?: React.ReactNode }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -147,11 +161,12 @@ export const PageWrapper = ({ children }: { children: React.ReactNode }) => (
   </motion.div>
 );
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement | HTMLTextAreaElement> {
+export type InputProps = React.ComponentProps<'input'> & {
   label?: string;
   icon?: React.ReactNode;
   textarea?: boolean;
-}
+  rows?: number;
+};
 
 export const Input = ({ label, icon, className = '', textarea = false, ...props }: InputProps) => {
   const baseInputStyles = `w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-xl py-3 ${icon ? 'pl-12' : 'pl-4'} pr-4 text-slate-900 dark:text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400 dark:placeholder:text-gray-600`;
@@ -168,17 +183,64 @@ export const Input = ({ label, icon, className = '', textarea = false, ...props 
         {textarea ? (
           <textarea 
             className={baseInputStyles}
-            rows={4}
+            rows={props.rows || 4}
             {...(props as any)}
           />
         ) : (
           <input 
             className={baseInputStyles}
-            {...(props as any)}
+            {...props}
           />
         )}
         <div className="absolute inset-0 rounded-xl bg-primary/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity" />
       </div>
     </div>
+  );
+};
+
+export interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: React.ReactNode;
+  children?: React.ReactNode;
+  className?: string;
+  maxWidth?: string;
+}
+
+export const Modal = ({ isOpen, onClose, title, children, className = '', maxWidth = 'max-w-lg' }: ModalProps) => {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+          />
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className={`relative w-full ${maxWidth} bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ${className}`}
+          >
+             {/* Header if title exists */}
+             {(title || onClose) && (
+                <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/5">
+                    <div className="text-xl font-bold font-display dark:text-white text-slate-900">{title}</div>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors text-slate-500 dark:text-gray-400">
+                        <X size={20} />
+                    </button>
+                </div>
+             )}
+             <div className="overflow-y-auto custom-scrollbar">
+                {children}
+             </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 };
