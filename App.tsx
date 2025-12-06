@@ -8,6 +8,7 @@ import { Projects } from './pages/Projects';
 import { Auth } from './pages/Auth';
 import { Invoices } from './pages/Invoices';
 import { Profile } from './pages/Profile';
+import { Messages } from './pages/Messages';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -39,6 +40,7 @@ const App: React.FC = () => {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/invoices" element={<Invoices />} />
+                <Route path="/messages" element={<Messages />} />
                 <Route path="/profile" element={<Profile />} />
               </Routes>
             </Layout>

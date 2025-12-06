@@ -32,6 +32,7 @@ interface StatData {
   val: string;
   icon: React.ReactNode;
   change?: string;
+  link?: string;
 }
 
 export const Dashboard = () => {
@@ -98,16 +99,16 @@ export const Dashboard = () => {
 
   const adminStats: StatData[] = [
     { label: "Total Revenue", val: "$12,450", icon: <DollarSign className="text-green-500 dark:text-green-400" />, change: "+12%" },
-    { label: "Active Projects", val: "3", icon: <BriefcaseIcon className="text-blue-500 dark:text-blue-400" />, change: "+1" },
-    { label: "Pending Invoices", val: "2", icon: <Clock className="text-yellow-500 dark:text-yellow-400" />, change: "$4.5k" },
+    { label: "Active Projects", val: "3", icon: <BriefcaseIcon className="text-blue-500 dark:text-blue-400" />, change: "+1", link: '/projects' },
+    { label: "Pending Invoices", val: "2", icon: <Clock className="text-yellow-500 dark:text-yellow-400" />, change: "$4.5k", link: '/invoices' },
     { label: "Total Leads", val: "28", icon: <Users className="text-purple-500 dark:text-purple-400" />, change: "+5" },
   ];
 
   const clientStats: StatData[] = [
-    { label: "Project Status", val: "On Track", icon: <TrendingUp className="text-green-500 dark:text-green-400" /> },
+    { label: "Project Status", val: "On Track", icon: <TrendingUp className="text-green-500 dark:text-green-400" />, link: '/projects' },
     { label: "Pending Tasks", val: tasks.filter(t => t.status !== 'Done').length.toString(), icon: <CheckCircle2 className="text-blue-500 dark:text-blue-400" /> },
-    { label: "Next Invoice", val: "$2,500", icon: <FileText className="text-yellow-500 dark:text-yellow-400" /> },
-    { label: "Unread Messages", val: "1", icon: <Bell className="text-purple-500 dark:text-purple-400" /> },
+    { label: "Next Invoice", val: "$2,500", icon: <FileText className="text-yellow-500 dark:text-yellow-400" />, link: '/invoices' },
+    { label: "Unread Messages", val: "1", icon: <Bell className="text-purple-500 dark:text-purple-400" />, link: '/messages' },
   ];
 
   const stats = isAdmin ? adminStats : clientStats;
@@ -140,14 +141,9 @@ export const Dashboard = () => {
 
         {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          {stats.map((stat, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-            >
-              <GlassCard className="p-6">
+          {stats.map((stat, i) => {
+            const Content = (
+              <GlassCard className={`p-6 h-full ${stat.link ? 'cursor-pointer hover:border-primary/30 transition-colors' : ''}`}>
                 <div className="flex justify-between items-start mb-4">
                   <span className="text-slate-500 dark:text-gray-400 text-sm font-medium">{stat.label}</span>
                   <div className="p-2 bg-slate-100 dark:bg-white/5 rounded-lg">{stat.icon}</div>
@@ -159,8 +155,23 @@ export const Dashboard = () => {
                   )}
                 </div>
               </GlassCard>
-            </motion.div>
-          ))}
+            );
+
+            return (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+              >
+                {stat.link ? (
+                  <Link to={stat.link}>{Content}</Link>
+                ) : (
+                  Content
+                )}
+              </motion.div>
+            );
+          })}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, LayoutDashboard, FileText, Home, Sparkles, LogIn, LogOut, CreditCard, User, Sun, Moon, Briefcase } from 'lucide-react';
+import { Menu, X, LayoutDashboard, FileText, Home, Sparkles, LogIn, LogOut, CreditCard, User, Sun, Moon, Briefcase, MessageSquare } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Button } from './UI';
@@ -44,6 +44,7 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
   const protectedLinks = [
     { to: '/dashboard', text: 'Dashboard', icon: <LayoutDashboard size={18} /> },
     { to: '/projects', text: user?.role === 'admin' ? 'Proposals' : 'Projects', icon: <Briefcase size={18} /> },
+    { to: '/messages', text: 'Messages', icon: <MessageSquare size={18} /> },
     { to: '/invoices', text: 'Invoices', icon: <CreditCard size={18} /> },
   ];
 

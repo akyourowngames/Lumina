@@ -5,32 +5,45 @@ import { Briefcase, ChevronRight, X, Calendar, DollarSign, Plus, Loader2, Send, 
 import { useAuth } from '../context/AuthContext';
 import { Project, Application } from '../types';
 import { useToast } from '../context/ToastContext';
-import { collection, addDoc, getDocs, updateDoc, doc, serverTimestamp, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, doc, setDoc, serverTimestamp, query, where, onSnapshot } from 'firebase/firestore';
 import { firestore } from '../services/firebase';
 
 export const Projects = () => {
   const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const { showToast } = useToast();
+  
+  // Selection State (with persistence for animation)
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [displayProject, setDisplayProject] = useState<Project | null>(null);
+
+  useEffect(() => {
+    if (selectedProject) setDisplayProject(selectedProject);
+  }, [selectedProject]);
   
   // Freelancer specific view state
   const [freelancerViewMode, setFreelancerViewMode] = useState<'browse' | 'mine'>('browse');
 
-  // Application State (For Clients viewing)
+  // Application State
   const [applications, setApplications] = useState<Application[]>([]);
   const [loadingApps, setLoadingApps] = useState(false);
+  const [hiringAppId, setHiringAppId] = useState<string | null>(null);
 
-  // Apply Modal State (For Freelancers applying)
+  // Apply Modal State
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
-  const [applyForm, setApplyForm] = useState({ message: '', price: '' });
   const [projectToApply, setProjectToApply] = useState<Project | null>(null);
+  const [displayProjectToApply, setDisplayProjectToApply] = useState<Project | null>(null);
+  const [applyForm, setApplyForm] = useState({ message: '', price: '' });
   const [isApplying, setIsApplying] = useState(false);
   const [checkingApplication, setCheckingApplication] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
 
-  // Create Project State (For Clients)
+  useEffect(() => {
+    if (projectToApply) setDisplayProjectToApply(projectToApply);
+  }, [projectToApply]);
+
+  // Create Project State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newProject, setNewProject] = useState({
@@ -49,17 +62,12 @@ export const Projects = () => {
         const projectsRef = collection(firestore, "projects");
         let q;
 
-        // Filtering Logic
         if (user.role === 'client') {
-            // Clients see projects they own
             q = query(projectsRef, where("ownerId", "==", user.id));
         } else {
-            // Freelancers (Admin)
             if (freelancerViewMode === 'mine') {
-                // My Projects: Where I am the freelancer
                 q = query(projectsRef, where("freelancerId", "==", user.id));
             } else {
-                // Browse: Open projects
                 q = query(projectsRef, where("status", "==", "Requested")); 
             }
         }
@@ -83,19 +91,16 @@ export const Projects = () => {
             startDate: data.startDate,
             budget: data.budget || '',
             tags: data.tags || [],
-            // Robust timestamp handling
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || new Date().toISOString()),
             updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : undefined
           } as Project;
         });
 
-        // Client-side sort by newest first
         fetchedProjects.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
         setProjects(fetchedProjects);
       } catch (error: any) {
         console.error("Error fetching projects:", error);
-        // Only show toast if it's NOT a permission error to avoid spamming the user on load
         if (error.code !== 'permission-denied') {
             showToast("Failed to load projects", "error");
         }
@@ -105,50 +110,40 @@ export const Projects = () => {
     };
 
     fetchProjects();
-  }, [user, isCreateModalOpen, freelancerViewMode]); // Re-fetch when view mode changes
+  }, [user, isCreateModalOpen, freelancerViewMode]);
 
-  // 2. Fetch Applications (Real-time listener)
+  // 2. Fetch Applications
   useEffect(() => {
-    // Only fetch if a project is selected and the user is a client
     if (!selectedProject || user?.role !== 'client') {
-        setApplications([]); // Clear apps if condition not met
+        setApplications([]);
         return;
     }
     
     setLoadingApps(true);
     
-    // Create query
     const appsRef = collection(firestore, "projects", selectedProject.id, "applications");
     const q = query(appsRef);
 
-    // Use onSnapshot for real-time updates and better cache handling
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const apps = snapshot.docs.map(d => {
             const data = d.data();
             return {
                 id: d.id,
                 ...data,
-                // Handle various timestamp formats safely (Firestore Timestamp vs string vs null)
                 createdAt: data.createdAt?.toDate 
                     ? data.createdAt.toDate().toISOString() 
                     : (data.createdAt || new Date().toISOString())
             };
         }) as Application[];
         
-        // Client-side sort: Newest first
         apps.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        
         setApplications(apps);
         setLoadingApps(false);
     }, (error) => {
         console.error("Error fetching applications:", error);
-        if (error.code === 'permission-denied') {
-           showToast("Access denied: You may not have permission to view applications.", "error");
-        }
         setLoadingApps(false);
     });
 
-    // Cleanup subscription on unmount or when dependency changes
     return () => unsubscribe();
 
   }, [selectedProject, user]);
@@ -156,18 +151,16 @@ export const Projects = () => {
 
   // 3. ACTIONS
 
-  // Freelancer: Open Apply Modal and Check for Existing Application
   const openApplyModal = async (project: Project, e: React.MouseEvent) => {
     e.stopPropagation();
     setProjectToApply(project);
-    setApplyForm({ message: '', price: project.budget }); // Pre-fill budget as suggested price
+    setApplyForm({ message: '', price: project.budget });
     setIsApplyModalOpen(true);
     setHasApplied(false);
     setCheckingApplication(true);
 
     if (user) {
         try {
-            // Check if user has already applied to this project
             const appsRef = collection(firestore, "projects", project.id, "applications");
             const q = query(appsRef, where("freelancerId", "==", user.id));
             const snapshot = await getDocs(q);
@@ -183,12 +176,10 @@ export const Projects = () => {
     }
   };
 
-  // Freelancer: Submit Application
   const handleApplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !projectToApply) return;
     
-    // Double check logic in case UI was bypassed, though UI prevents button click
     if (hasApplied) {
         showToast("You have already applied to this project.", "error");
         return;
@@ -209,8 +200,7 @@ export const Projects = () => {
         
         showToast("Application submitted successfully!", "success");
         setIsApplyModalOpen(false);
-        setProjectToApply(null);
-        setApplyForm({ message: '', price: '' });
+        // Don't clear projectToApply immediately for animation persistence
     } catch (e) {
         console.error(e);
         showToast("Failed to apply.", "error");
@@ -219,16 +209,16 @@ export const Projects = () => {
     }
   };
 
-  // Client: Hire Freelancer
   const handleHireFreelancer = async (application: Application) => {
     if (!selectedProject) return;
+    setHiringAppId(application.id);
 
     try {
         // 1. Update Project
         const projectRef = doc(firestore, "projects", selectedProject.id);
         await updateDoc(projectRef, {
             freelancerId: application.freelancerId,
-            status: 'Assigned', // Changed from In Progress to Assigned per request
+            status: 'Assigned',
             updatedAt: serverTimestamp()
         });
 
@@ -238,23 +228,37 @@ export const Projects = () => {
             status: 'accepted'
         });
 
-        // UI Update
+        // 3. Create or Initialize Chat Room
+        // Path: /chats/{projectId}
+        const chatRef = doc(firestore, "chats", selectedProject.id);
+        const ownerId = selectedProject.ownerId || selectedProject.clientId;
+        
+        await setDoc(chatRef, {
+            projectId: selectedProject.id,
+            ownerId: ownerId,
+            freelancerId: application.freelancerId,
+            active: true,
+            createdAt: serverTimestamp(),
+            closedAt: null,
+            participants: [ownerId, application.freelancerId].filter(Boolean)
+        }, { merge: true }); // Merge to avoid overwriting existing messages/history if any
+
+        // Update local state
         const updatedProject = { ...selectedProject, status: 'Assigned', freelancerId: application.freelancerId } as Project;
         
         setProjects(prev => prev.map(p => p.id === selectedProject.id ? updatedProject : p));
-        setSelectedProject(updatedProject); // Update modal view
-        
-        // Update local applications list (Snapshot will also update this, but optimistic update is fine)
+        setSelectedProject(updatedProject);
         setApplications(prev => prev.map(a => a.id === application.id ? { ...a, status: 'accepted' } : a));
 
-        showToast(`Hired ${application.freelancerName}!`, "success");
+        showToast(`Hired ${application.freelancerName}! Chat room created.`, "success");
     } catch (e) {
         console.error("Error hiring:", e);
         showToast("Failed to hire freelancer.", "error");
+    } finally {
+        setHiringAppId(null);
     }
   };
 
-  // Client: Create Project
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -282,7 +286,6 @@ export const Projects = () => {
       setIsCreateModalOpen(false);
       showToast("Request submitted successfully!", 'success');
       setNewProject({ title: '', description: '', budget: '', dueDate: '' });
-      // Trigger re-fetch naturally or update state manually if needed
     } catch (error) {
       console.error("Error creating project:", error);
       showToast("Failed to create project", "error");
@@ -381,7 +384,6 @@ export const Projects = () => {
                         {project.status === 'Requested' ? 'Open' : project.status}
                     </Badge>
                     
-                    {/* Apply Button for Freelancers on Browse View */}
                     {user?.role === 'admin' && freelancerViewMode === 'browse' && project.status === 'Requested' && (
                         <Button 
                             variant="primary" 
@@ -404,20 +406,20 @@ export const Projects = () => {
         <Modal
           isOpen={!!selectedProject}
           onClose={() => setSelectedProject(null)}
-          title={null} // Custom header inside
+          title={null}
           className="max-w-2xl"
+          hideHeader={true}
         >
-          {selectedProject && (
+          {displayProject && (
             <>
-                {/* Custom Header */}
                 <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 sticky top-0 z-10 backdrop-blur-md">
                   <div className="flex items-center gap-4">
                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center font-bold text-white">
-                        {selectedProject.client.charAt(0)}
+                        {displayProject.client.charAt(0)}
                      </div>
                      <div>
-                        <h2 className="text-xl font-bold dark:text-white text-slate-900">{selectedProject.title}</h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{selectedProject.client}</p>
+                        <h2 className="text-xl font-bold dark:text-white text-slate-900">{displayProject.title}</h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{displayProject.client}</p>
                      </div>
                   </div>
                   <button onClick={() => setSelectedProject(null)} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors text-slate-500 dark:text-gray-400">
@@ -425,11 +427,10 @@ export const Projects = () => {
                   </button>
                 </div>
 
-                {/* Body */}
                 <div className="p-8 bg-white dark:bg-slate-950 text-slate-900 dark:text-gray-300">
                    <div className="mb-8">
                       <h3 className="font-bold text-sm text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-2">Description</h3>
-                      <p className="leading-relaxed text-slate-700 dark:text-gray-300">{selectedProject.description || "No description provided."}</p>
+                      <p className="leading-relaxed text-slate-700 dark:text-gray-300">{displayProject.description || "No description provided."}</p>
                    </div>
 
                    <div className="grid grid-cols-2 gap-4 mb-8">
@@ -438,18 +439,17 @@ export const Projects = () => {
                             <Calendar size={18} />
                             <span className="font-bold">Due Date</span>
                          </div>
-                         <p className="font-mono text-slate-900 dark:text-white">{selectedProject.dueDate || 'N/A'}</p>
+                         <p className="font-mono text-slate-900 dark:text-white">{displayProject.dueDate || 'N/A'}</p>
                       </div>
                       <div className="p-4 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/5">
                          <div className="flex items-center gap-2 text-green-500 mb-1">
                             <DollarSign size={18} />
                             <span className="font-bold">Budget</span>
                          </div>
-                         <p className="font-mono text-slate-900 dark:text-white">{selectedProject.budget || 'N/A'}</p>
+                         <p className="font-mono text-slate-900 dark:text-white">{displayProject.budget || 'N/A'}</p>
                       </div>
                    </div>
 
-                   {/* Applications Section (For Clients) */}
                    {user?.role === 'client' && (
                        <div className="mt-8 border-t border-slate-200 dark:border-white/10 pt-8">
                            <h3 className="font-bold text-lg mb-4 text-slate-900 dark:text-white">Applications ({applications.length})</h3>
@@ -471,12 +471,14 @@ export const Projects = () => {
                                                <p className="text-xs text-gray-400 mt-2">Bid: {app.price} • {new Date(app.createdAt).toLocaleDateString()}</p>
                                            </div>
                                            
-                                           {selectedProject.status === 'Requested' && (
+                                           {displayProject.status === 'Requested' && (
                                                <div className="self-start sm:self-center">
                                                    <Button 
                                                         variant="primary" 
                                                         className="text-xs py-2 h-auto"
                                                         onClick={() => handleHireFreelancer(app)}
+                                                        isLoading={hiringAppId === app.id}
+                                                        loaderSize={16}
                                                    >
                                                        Hire
                                                    </Button>
@@ -490,13 +492,11 @@ export const Projects = () => {
                    )}
                 </div>
 
-                {/* Footer Actions */}
                 <div className="p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 flex justify-end gap-4 sticky bottom-0 z-10">
                     <Button variant="secondary" onClick={() => setSelectedProject(null)}>Close</Button>
                     
-                    {/* Freelancer Apply Button inside detail view if browsing */}
-                    {user?.role === 'admin' && freelancerViewMode === 'browse' && selectedProject.status === 'Requested' && (
-                        <Button onClick={(e) => openApplyModal(selectedProject, e)}>Apply Now</Button>
+                    {user?.role === 'admin' && freelancerViewMode === 'browse' && displayProject.status === 'Requested' && (
+                        <Button onClick={(e) => openApplyModal(displayProject, e)}>Apply Now</Button>
                     )}
                 </div>
             </>
@@ -511,10 +511,10 @@ export const Projects = () => {
           maxWidth="max-w-md"
         >
           <div className="p-6">
-              {projectToApply && (
+              {displayProjectToApply && (
                 <div className="mb-6">
                     <p className="text-sm text-gray-500">You are applying for:</p>
-                    <p className="font-bold text-lg text-slate-900 dark:text-white">{projectToApply.title}</p>
+                    <p className="font-bold text-lg text-slate-900 dark:text-white">{displayProjectToApply.title}</p>
                 </div>
               )}
 
@@ -538,7 +538,7 @@ export const Projects = () => {
                 <form onSubmit={handleApplySubmit} className="space-y-4">
                   <Input 
                     label="Your Bid Price" 
-                    placeholder={projectToApply?.budget}
+                    placeholder={displayProjectToApply?.budget}
                     value={applyForm.price}
                     onChange={(e) => setApplyForm({...applyForm, price: e.target.value})}
                     required

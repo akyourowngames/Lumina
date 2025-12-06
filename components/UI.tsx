@@ -1,8 +1,8 @@
 import React from 'react';
-import { motion, HTMLMotionProps, AnimatePresence } from 'framer-motion';
+import { motion, HTMLMotionProps, AnimatePresence, Variants } from 'framer-motion';
 import { Loader2, X } from 'lucide-react';
 
-export interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface GlassCardProps extends HTMLMotionProps<"div"> {
   children?: React.ReactNode;
   className?: string;
   hoverEffect?: boolean;
@@ -16,8 +16,8 @@ export const GlassCard = ({ children, className = '', hoverEffect = true, onClic
       whileHover={hoverEffect ? { scale: 1.02 } : {}}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
       className={`
-        bg-white/80 dark:bg-glass backdrop-blur-xl 
-        border border-slate-200 dark:border-glassBorder 
+        bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl 
+        border border-slate-200 dark:border-white/10 
         rounded-2xl p-6 relative overflow-hidden group 
         shadow-lg dark:shadow-none
         text-slate-900 dark:text-gray-100
@@ -40,14 +40,18 @@ export const GlassCard = ({ children, className = '', hoverEffect = true, onClic
   );
 };
 
-export type ButtonProps = React.ComponentProps<'button'> & {
+export interface ButtonProps extends HTMLMotionProps<"button"> {
   children?: React.ReactNode;
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
   isLoading?: boolean;
   className?: string;
-};
+  loaderSize?: number;
+  disabled?: boolean;
+  type?: "button" | "submit" | "reset";
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
+}
 
-export const Button = ({ children, variant = 'primary', className = '', isLoading, ...props }: ButtonProps) => {
+export const Button = ({ children, variant = 'primary', className = '', isLoading, loaderSize = 20, disabled, ...props }: ButtonProps) => {
   const baseClasses = "relative px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden";
   
   const variants = {
@@ -60,11 +64,11 @@ export const Button = ({ children, variant = 'primary', className = '', isLoadin
 
   return (
     <motion.button
-      whileTap={{ scale: 0.96 }}
+      whileTap={{ scale: 0.95 }}
       whileHover={{ scale: isLoading ? 1 : 1.02 }}
       className={`${baseClasses} ${variants[variant]} ${className}`}
-      disabled={isLoading || props.disabled}
-      {...(props as HTMLMotionProps<"button">)}
+      disabled={isLoading || disabled}
+      {...props}
     >
       <div className={`flex items-center gap-2 ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity`}>
         {children}
@@ -72,7 +76,7 @@ export const Button = ({ children, variant = 'primary', className = '', isLoadin
       
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <Loader2 className="animate-spin text-current" size={20} />
+          <Loader2 className="animate-spin text-current" size={loaderSize} />
         </div>
       )}
     </motion.button>
@@ -103,7 +107,7 @@ export const Badge = ({ children, color = 'blue' }: BadgeProps) => {
 export const AnimatedText = ({ text, className = '' }: { text: string; className?: string }) => {
   const words = text.split(" ");
 
-  const container = {
+  const container: Variants = {
     hidden: { opacity: 0 },
     visible: (i = 1) => ({
       opacity: 1,
@@ -111,7 +115,7 @@ export const AnimatedText = ({ text, className = '' }: { text: string; className
     }),
   };
 
-  const child = {
+  const child: Variants = {
     visible: {
       opacity: 1,
       y: 0,
@@ -205,9 +209,10 @@ export interface ModalProps {
   children?: React.ReactNode;
   className?: string;
   maxWidth?: string;
+  hideHeader?: boolean;
 }
 
-export const Modal = ({ isOpen, onClose, title, children, className = '', maxWidth = 'max-w-lg' }: ModalProps) => {
+export const Modal = ({ isOpen, onClose, title, children, className = '', maxWidth = 'max-w-lg', hideHeader = false }: ModalProps) => {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -223,11 +228,11 @@ export const Modal = ({ isOpen, onClose, title, children, className = '', maxWid
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            transition={{ type: "spring", stiffness: 350, damping: 25 }}
             className={`relative w-full ${maxWidth} bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ${className}`}
           >
-             {/* Header if title exists */}
-             {(title || onClose) && (
+             {/* Header */}
+             {!hideHeader && (
                 <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/5">
                     <div className="text-xl font-bold font-display dark:text-white text-slate-900">{title}</div>
                     <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors text-slate-500 dark:text-gray-400">
@@ -235,7 +240,9 @@ export const Modal = ({ isOpen, onClose, title, children, className = '', maxWid
                     </button>
                 </div>
              )}
-             <div className="overflow-y-auto custom-scrollbar">
+             
+             {/* Body */}
+             <div className="overflow-y-auto custom-scrollbar flex-1 relative">
                 {children}
              </div>
           </motion.div>
