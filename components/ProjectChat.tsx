@@ -56,7 +56,23 @@ const SeenStatus = ({ isSeen, className = "" }: { isSeen: boolean, className?: s
 // Helper for formatting last seen
 const formatLastSeen = (timestamp: any) => {
     if (!timestamp) return '';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    let date;
+    
+    // Handle Firestore Timestamp
+    if (timestamp?.toDate) {
+        date = timestamp.toDate();
+    } 
+    // Handle Date object
+    else if (timestamp instanceof Date) {
+        date = timestamp;
+    }
+    // Handle ISO string or timestamp number
+    else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+        date = new Date(timestamp);
+    } else {
+        return '';
+    }
+
     if (isNaN(date.getTime())) return '';
     
     const diff = (new Date().getTime() - date.getTime()) / 1000 / 60; // minutes
@@ -296,19 +312,37 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
     };
   }, [project.id, user]);
 
+  // Force re-render every minute to update "last seen" text
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Listen for Other User Presence
   useEffect(() => {
-    if (!user || !project) return;
+    if (!user) return;
 
-    // Identify Other ID
-    const ownerId = project.ownerId || project.clientId;
-    const freelancerId = project.freelancerId;
-    let targetId = null;
+    let targetId: string | null = null;
 
-    if (user.id === ownerId) {
-        targetId = freelancerId;
-    } else {
-        targetId = ownerId;
+    // 1. Try to determine other user from ChatRoom (most accurate source of truth)
+    if (chatRoom) {
+        if (user.id === chatRoom.ownerId) {
+            targetId = chatRoom.freelancerId;
+        } else if (user.id === chatRoom.freelancerId) {
+            targetId = chatRoom.ownerId;
+        }
+    } 
+    // 2. Fallback to Project (if chatRoom not loaded yet or doesn't exist)
+    else if (project) {
+        const ownerId = project.ownerId || project.clientId;
+        if (user.id === ownerId) {
+            // If I am the owner, look for freelancer
+            targetId = project.freelancerId || null;
+        } else {
+            // If I am not the owner, the other person IS the owner
+            targetId = ownerId;
+        }
     }
 
     if (!targetId) {
@@ -317,13 +351,17 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
     }
 
     const unsub = firestore.collection('users').doc(targetId).onSnapshot(doc => {
-        setOtherUserData(doc.data());
+        if (doc.exists) {
+            setOtherUserData(doc.data());
+        } else {
+            setOtherUserData(null);
+        }
     }, err => {
         console.error("Error fetching presence:", err);
     });
 
     return () => unsub();
-  }, [user, project]);
+  }, [user, project, chatRoom]);
 
   // Cleanup on unmount (Reset typing status)
   useEffect(() => {
@@ -876,11 +914,11 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
   let isOnline = false;
 
   if (otherUserData) {
-      // Check strict online flag OR heartbeat within 60s
+      // Logic: A user is considered online if: isOnline === true OR lastSeen is within the past 60 seconds.
       const lastSeenDate = otherUserData.lastSeen?.toDate ? otherUserData.lastSeen.toDate() : new Date(otherUserData.lastSeen || 0);
       const diffSeconds = (new Date().getTime() - lastSeenDate.getTime()) / 1000;
       
-      // If isOnline is true AND lastSeen is recent (prevent stuck online status)
+      // If isOnline is true OR heartbeat was recent
       if (otherUserData.isOnline || diffSeconds < 60) {
           isOnline = true;
           statusText = "Online";

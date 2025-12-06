@@ -82,43 +82,42 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
     const userRef = firestore.collection('users').doc(user.id);
 
-    // 1. Set Online
-    const setOnline = () => {
-        userRef.update({
-            isOnline: true,
-            lastSeen: timestamp()
-        }).catch(err => {
-            // Ignore errors (e.g., permissions during logout)
-        });
-    };
-
-    setOnline();
+    // 1. Set Online immediately on login/mount
+    // Use set with merge: true to ensure we don't overwrite other fields and it works even if doc is partial
+    userRef.set({
+        isOnline: true,
+        lastSeen: timestamp()
+    }, { merge: true }).catch(err => {
+        console.warn("Presence init error (checking permissions):", err.code);
+    });
 
     // 2. Heartbeat (every 30s)
     const heartbeat = setInterval(() => {
         userRef.update({
-            lastSeen: timestamp()
-        }).catch(console.error);
+            lastSeen: timestamp(),
+            isOnline: true
+        }).catch(err => {
+             // Silently fail if permissions are lost (e.g. token expired)
+             if(err.code !== 'permission-denied') console.error("Heartbeat error:", err);
+        });
     }, 30000);
 
-    // 3. Set Offline on cleanup
-    const setOffline = () => {
+    // 3. Set Offline on tab close / unload
+    const handleTabClose = () => {
+        // This is best-effort as we can't await
         userRef.update({
             isOnline: false,
             lastSeen: timestamp()
-        }).catch(console.error);
-    };
-
-    // Handle tab close specifically
-    const handleTabClose = () => {
-        setOffline();
+        }).catch(() => {});
     };
     window.addEventListener('beforeunload', handleTabClose);
 
     return () => {
         clearInterval(heartbeat);
         window.removeEventListener('beforeunload', handleTabClose);
-        setOffline();
+        // Note: We do NOT call setOffline here automatically. 
+        // If the component unmounts because of logout, we handle setOffline in the logout function 
+        // to avoid "Missing Permissions" errors after auth is cleared.
     };
   }, [user?.id]);
 
@@ -136,8 +135,10 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
     } catch (error: any) {
       console.error("Login Error:", error.code);
       
-      if (error.code === 'auth/invalid-credential') {
-          showToast("User not found or wrong password. Please Sign Up if you don't have an account.", 'error');
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+          showToast("Invalid email or password.", 'error');
+      } else if (error.code === 'auth/too-many-requests') {
+          showToast("Too many failed attempts. Please try again later.", 'error');
       } else {
           showToast(error.message || "Failed to login.", 'error');
       }
@@ -260,6 +261,19 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
   const logout = async () => {
     try {
+      // CRITICAL: Set offline status BEFORE signing out
+      // We must do this while we still have permissions
+      if (user?.id) {
+          try {
+            await firestore.collection("users").doc(user.id).update({
+                isOnline: false,
+                lastSeen: timestamp()
+            });
+          } catch(e) {
+            console.warn("Could not set offline status (network or permission issue):", e);
+          }
+      }
+
       await auth.signOut();
       setUser(null); 
       showToast("Logged out successfully.", 'info');
