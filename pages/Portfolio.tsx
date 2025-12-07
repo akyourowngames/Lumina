@@ -1,7 +1,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { GlassCard, Button, Badge, PageWrapper } from '../components/UI';
-import { ExternalLink, Github } from 'lucide-react';
+import { ExternalLink, Github, Lock, User } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 const projects = [
   {
@@ -39,6 +41,32 @@ const projects = [
 ];
 
 export const Portfolio = () => {
+  const { user } = useAuth();
+  const profileRole = user?.profileRole || (user?.role === 'admin' ? 'freelancer' : 'client');
+  const isClientOnly = profileRole === 'client';
+
+  // Access Guard for Client-Only users
+  if (user && isClientOnly) {
+      return (
+          <PageWrapper>
+              <div className="h-[80vh] flex flex-col items-center justify-center text-center px-6">
+                  <div className="w-20 h-20 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6">
+                      <Lock size={32} className="text-slate-400" />
+                  </div>
+                  <h1 className="text-3xl font-bold font-display text-slate-900 dark:text-white mb-2">Portfolio is for freelancers</h1>
+                  <p className="text-slate-500 dark:text-gray-400 max-w-md mb-8">
+                      Switch your role to "Freelancer" or "Both" in your profile settings to add and manage portfolio items.
+                  </p>
+                  <Link to="/profile">
+                      <Button>
+                          <User size={18} /> Go to Profile Settings
+                      </Button>
+                  </Link>
+              </div>
+          </PageWrapper>
+      );
+  }
+
   return (
     <PageWrapper>
       <div className="max-w-7xl mx-auto px-6 pb-20">

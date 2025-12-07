@@ -13,7 +13,7 @@ export const GlassCard = ({ children, className = '', hoverEffect = true, onClic
   return (
     <motion.div
       onClick={onClick}
-      whileHover={hoverEffect ? { scale: 1.02 } : {}}
+      whileHover={hoverEffect ? { scale: 1.01 } : {}}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
       className={`
         bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl 
@@ -31,10 +31,6 @@ export const GlassCard = ({ children, className = '', hoverEffect = true, onClic
       {/* Border Glow on Hover */}
       <div className="absolute inset-0 rounded-2xl border border-primary/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none box-border" />
       
-      {/* Top Highlight Line */}
-      <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-50 group-hover:opacity-100 group-hover:h-[2px] group-hover:shadow-[0_0_15px_rgba(99,102,241,0.6)] transition-all duration-500 pointer-events-none" />
-
-      {/* Children rendered directly to respect flex container styles on the parent */}
       {children}
     </motion.div>
   );
@@ -86,20 +82,22 @@ export const Button = ({ children, variant = 'primary', className = '', isLoadin
 
 export interface BadgeProps {
   children?: React.ReactNode;
-  color?: 'blue' | 'green' | 'red' | 'purple' | 'yellow';
+  color?: 'blue' | 'green' | 'red' | 'purple' | 'yellow' | 'gray';
+  className?: string;
 }
 
-export const Badge = ({ children, color = 'blue' }: BadgeProps) => {
+export const Badge = ({ children, color = 'blue', className = '' }: BadgeProps) => {
   const colors = {
     blue: 'bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 border-blue-500/30',
     green: 'bg-green-500/10 dark:bg-green-500/20 text-green-600 dark:text-green-300 border-green-500/30',
     red: 'bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-300 border-red-500/30',
     purple: 'bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/30',
     yellow: 'bg-yellow-500/10 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-300 border-yellow-500/30',
+    gray: 'bg-slate-500/10 dark:bg-slate-500/20 text-slate-600 dark:text-slate-300 border-slate-500/30',
   };
 
   return (
-    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${colors[color]}`}>
+    <span className={`px-2.5 py-0.5 rounded-md text-xs font-semibold border ${colors[color]} ${className}`}>
       {children}
     </span>
   );
@@ -174,11 +172,11 @@ export type InputProps = React.ComponentProps<'input'> & {
 };
 
 export const Input = ({ label, icon, className = '', textarea = false, ...props }: InputProps) => {
-  const baseInputStyles = `w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-xl py-3 ${icon ? 'pl-12' : 'pl-4'} pr-4 text-slate-900 dark:text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400 dark:placeholder:text-gray-600`;
+  const baseInputStyles = `w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-xl py-3 ${icon ? 'pl-12' : 'pl-4'} pr-4 text-slate-900 dark:text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400 dark:placeholder:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed`;
 
   return (
     <div className={`relative ${className}`}>
-      {label && <label className="block text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 ml-1">{label}</label>}
+      {label && <label className="block text-xs font-bold text-slate-700 dark:text-gray-300 mb-1.5 ml-1 uppercase tracking-wide">{label}</label>}
       <div className="relative group">
         {icon && (
           <div className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-primary transition-colors">
@@ -201,6 +199,34 @@ export const Input = ({ label, icon, className = '', textarea = false, ...props 
       </div>
     </div>
   );
+};
+
+export const ProgressBar = ({ progress, className = "" }: { progress: number, className?: string }) => {
+  return (
+    <div className={`h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden ${className}`}>
+      <motion.div 
+        className="h-full bg-gradient-to-r from-primary to-secondary"
+        initial={{ width: 0 }}
+        animate={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+        transition={{ duration: 1, ease: "easeOut" }}
+      />
+    </div>
+  );
+};
+
+export const Switch = ({ checked, onChange, label }: { checked: boolean, onChange: (checked: boolean) => void, label?: string }) => {
+    return (
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => onChange(!checked)}>
+            <div className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${checked ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'}`}>
+                <motion.div 
+                    className="w-4 h-4 bg-white rounded-full shadow-md"
+                    animate={{ x: checked ? 24 : 0 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
+            </div>
+            {label && <span className="text-sm font-medium text-slate-700 dark:text-gray-300 select-none">{label}</span>}
+        </div>
+    );
 };
 
 export interface ModalProps {

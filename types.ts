@@ -3,6 +3,20 @@ import React from 'react';
 export type Role = 'admin' | 'client';
 export type Theme = 'dark' | 'light';
 
+export interface PortfolioItem {
+  id: string;
+  title: string;
+  subtitle?: string;
+  description: string;
+  role?: string;
+  technologies: string[];
+  imageUrl: string | null;
+  liveUrl?: string | null;
+  githubUrl?: string | null;
+  createdAt: any;
+  updatedAt?: any;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -15,11 +29,18 @@ export interface User {
   location?: string;
   password?: string;
   
-  // New Profile Fields
+  // Profile Fields
   headline?: string;
   skills?: string[];
   hourlyRate?: number;
   profileRole?: 'client' | 'freelancer' | 'both';
+  
+  // New "God Mode" Fields
+  available?: boolean;
+  website?: string;
+  github?: string;
+  twitter?: string;
+  linkedin?: string;
 }
 
 export interface Project {

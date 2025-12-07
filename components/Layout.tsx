@@ -36,9 +36,14 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
+  // Role Logic
+  const profileRole = user?.profileRole || (user?.role === 'admin' ? 'freelancer' : 'client');
+  const isClientOnly = profileRole === 'client';
+
   const publicLinks = [
     { to: '/', text: 'Home', icon: <Home size={18} /> },
-    { to: '/portfolio', text: 'Portfolio', icon: <Sparkles size={18} /> },
+    // Only show Portfolio link if NOT client-only (i.e. Freelancer, Both, or non-logged in public visitor)
+    ...(!user || !isClientOnly ? [{ to: '/portfolio', text: 'Portfolio', icon: <Sparkles size={18} /> }] : []),
   ];
 
   const protectedLinks = [
