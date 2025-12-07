@@ -7,6 +7,33 @@ import { Project, Application } from '../types';
 import { useToast } from '../context/ToastContext';
 import { firestore, timestamp } from '../services/firebase';
 
+// Helper component to display user info inline
+const UserInfoTag = ({ userId, type }: { userId: string, type: 'headline' | 'skills' }) => {
+    const [data, setData] = useState<{headline?: string, skills?: string[]} | null>(null);
+    useEffect(() => {
+       if(!userId) return;
+       const unsub = firestore.collection('users').doc(userId).onSnapshot(doc => {
+           if(doc.exists) setData(doc.data() as any);
+       });
+       return () => unsub();
+    }, [userId]);
+  
+    if (!data) return null;
+
+    if (type === 'headline' && data.headline) {
+        return <span className="text-xs text-slate-500 dark:text-gray-400 block mt-0.5 truncate">{data.headline}</span>;
+    }
+    
+    if (type === 'skills' && data.skills && data.skills.length > 0) {
+        return (
+            <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded ml-2 border border-primary/20 whitespace-nowrap hidden sm:inline-block">
+                {data.skills[0]}
+            </span>
+        );
+    }
+    return null;
+}
+
 export const Projects = () => {
   const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -67,6 +94,7 @@ export const Projects = () => {
             if (freelancerViewMode === 'mine') {
                 q = projectsRef.where("freelancerId", "==", user.id);
             } else {
+                // Only show requested (open) projects in browse mode
                 q = projectsRef.where("status", "==", "Requested"); 
             }
         }
@@ -198,7 +226,6 @@ export const Projects = () => {
         
         showToast("Application submitted successfully!", "success");
         setIsApplyModalOpen(false);
-        // Don't clear projectToApply immediately for animation persistence
     } catch (e) {
         console.error(e);
         showToast("Failed to apply.", "error");
@@ -212,22 +239,40 @@ export const Projects = () => {
     setHiringAppId(application.id);
 
     try {
-        // 1. Update Project
+        const batch = firestore.batch();
+        
+        // References
         const projectRef = firestore.collection("projects").doc(selectedProject.id);
-        await projectRef.update({
+        const appsRef = firestore.collection("projects").doc(selectedProject.id).collection("applications");
+        
+        // 1. Update Project Status
+        batch.update(projectRef, {
             freelancerId: application.freelancerId,
-            status: 'Assigned',
+            status: 'Hired',
             updatedAt: timestamp()
         });
 
-        // 2. Update Application Status
-        const appRef = firestore.collection("projects").doc(selectedProject.id).collection("applications").doc(application.id);
-        await appRef.update({
-            status: 'accepted'
+        // 2. Fetch all apps to update statuses in batch
+        const allAppsSnap = await appsRef.get();
+        
+        allAppsSnap.docs.forEach(doc => {
+            const appRef = appsRef.doc(doc.id);
+            const appData = doc.data();
+            
+            if (doc.id === application.id) {
+                // Accepted
+                batch.update(appRef, { status: 'accepted', updatedAt: timestamp() });
+            } else {
+                // Reject pending applications
+                if (appData.status === 'applied') {
+                    batch.update(appRef, { status: 'rejected', updatedAt: timestamp() });
+                }
+            }
         });
 
+        await batch.commit();
+
         // 3. Create or Initialize Chat Room
-        // Path: /chats/{projectId}
         const chatRef = firestore.collection("chats").doc(selectedProject.id);
         const ownerId = selectedProject.ownerId || selectedProject.clientId;
         
@@ -239,16 +284,25 @@ export const Projects = () => {
             createdAt: timestamp(),
             closedAt: null,
             participants: [ownerId, application.freelancerId].filter(Boolean)
-        }, { merge: true }); // Merge to avoid overwriting existing messages/history if any
+        }, { merge: true });
 
-        // Update local state
-        const updatedProject = { ...selectedProject, status: 'Assigned', freelancerId: application.freelancerId } as Project;
-        
+        // Update local state immediately for responsiveness
+        const updatedProject = { 
+            ...selectedProject, 
+            status: 'Hired', 
+            freelancerId: application.freelancerId 
+        } as Project;
+
         setProjects(prev => prev.map(p => p.id === selectedProject.id ? updatedProject : p));
         setSelectedProject(updatedProject);
-        setApplications(prev => prev.map(a => a.id === application.id ? { ...a, status: 'accepted' } : a));
+        
+        setApplications(prev => prev.map(a => {
+            if (a.id === application.id) return { ...a, status: 'accepted' };
+            if (a.status === 'applied') return { ...a, status: 'rejected' };
+            return a;
+        }));
 
-        showToast(`Hired ${application.freelancerName}! Chat room created.`, "success");
+        showToast(`Hired ${application.freelancerName}!`, "success");
     } catch (e) {
         console.error("Error hiring:", e);
         showToast("Failed to hire freelancer.", "error");
@@ -359,7 +413,7 @@ export const Projects = () => {
                 <GlassCard className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-primary/50 transition-colors">
                   <div className="flex items-center gap-4 w-full sm:w-auto">
                     <div className={`p-3 rounded-xl shrink-0 ${
-                        project.status === 'Assigned' || project.status === 'In Progress' ? 'bg-blue-500/20 text-blue-500' : 
+                        project.status === 'Assigned' || project.status === 'In Progress' || project.status === 'Hired' ? 'bg-blue-500/20 text-blue-500' : 
                         project.status === 'Completed' ? 'bg-green-500/20 text-green-500' : 
                         project.status === 'Requested' ? 'bg-purple-500/20 text-purple-500' : 'bg-gray-500/20 text-gray-400'
                     }`}>
@@ -367,15 +421,22 @@ export const Projects = () => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <h3 className="font-bold text-lg group-hover:text-primary transition-colors text-slate-900 dark:text-white truncate pr-2">{project.title}</h3>
-                      <p className="text-slate-500 dark:text-gray-400 text-sm truncate">
-                        {user?.role === 'admin' ? `Client: ${project.client}` : `Due: ${project.dueDate}`}
-                      </p>
+                      <div className="text-sm">
+                        {user?.role === 'admin' ? (
+                            <div>
+                                <span className="text-slate-500 dark:text-gray-400">Client: {project.client}</span>
+                                {project.ownerId && <UserInfoTag userId={project.ownerId} type="headline" />}
+                            </div>
+                        ) : (
+                            <span className="text-slate-500 dark:text-gray-400">Due: {project.dueDate}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-4 sm:gap-6 w-full sm:w-auto justify-between sm:justify-end">
                     <span className="font-mono text-xl font-bold hidden sm:block text-slate-900 dark:text-white whitespace-nowrap">{project.budget}</span>
                     <Badge color={
-                      project.status === 'Assigned' || project.status === 'In Progress' ? 'blue' : 
+                      project.status === 'Assigned' || project.status === 'In Progress' || project.status === 'Hired' ? 'blue' : 
                       project.status === 'Completed' ? 'green' : 
                       project.status === 'Requested' ? 'purple' : 'yellow'
                     }>
@@ -417,7 +478,10 @@ export const Projects = () => {
                      </div>
                      <div>
                         <h2 className="text-xl font-bold dark:text-white text-slate-900">{displayProject.title}</h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{displayProject.client}</p>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                             {displayProject.client}
+                             {displayProject.ownerId && <UserInfoTag userId={displayProject.ownerId} type="headline" />}
+                        </div>
                      </div>
                   </div>
                   <button onClick={() => setSelectedProject(null)} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors text-slate-500 dark:text-gray-400">
@@ -463,14 +527,20 @@ export const Projects = () => {
                                            <div>
                                                <div className="flex items-center gap-2 mb-1">
                                                    <span className="font-bold text-slate-900 dark:text-white">{app.freelancerName}</span>
-                                                   {app.status === 'accepted' && <Badge color="green">Hired</Badge>}
+                                                   <UserInfoTag userId={app.freelancerId} type="skills" />
                                                </div>
-                                               <p className="text-sm text-gray-600 dark:text-gray-300 italic">"{app.message}"</p>
+                                               <UserInfoTag userId={app.freelancerId} type="headline" />
+                                               <p className="text-sm text-gray-600 dark:text-gray-300 italic mt-2">"{app.message}"</p>
                                                <p className="text-xs text-gray-400 mt-2">Bid: {app.price} • {new Date(app.createdAt).toLocaleDateString()}</p>
                                            </div>
                                            
-                                           {displayProject.status === 'Requested' && (
-                                               <div className="self-start sm:self-center">
+                                           <div className="self-start sm:self-center">
+                                                {/* UI States after hire */}
+                                                {app.status === 'accepted' && <Badge color="green">Hired</Badge>}
+                                                {app.status === 'rejected' && <Badge color="red">Rejected</Badge>}
+
+                                                {/* Hire Button for Pending Apps on Open Projects */}
+                                                {displayProject.status === 'Requested' && app.status === 'applied' && (
                                                    <Button 
                                                         variant="primary" 
                                                         className="text-xs py-2 h-auto"
@@ -480,8 +550,8 @@ export const Projects = () => {
                                                    >
                                                        Hire
                                                    </Button>
-                                               </div>
-                                           )}
+                                               )}
+                                           </div>
                                        </div>
                                    ))}
                                </div>

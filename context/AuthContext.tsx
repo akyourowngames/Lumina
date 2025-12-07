@@ -76,35 +76,33 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
-  // Presence System
+  // --- Real-time Presence System ---
   useEffect(() => {
     if (!user?.id) return;
 
     const userRef = firestore.collection('users').doc(user.id);
 
-    // 1. Set Online immediately on login/mount
-    // Use set with merge: true to ensure we don't overwrite other fields and it works even if doc is partial
+    // 1. Set Online immediately on mount
     userRef.set({
         isOnline: true,
         lastSeen: timestamp()
-    }, { merge: true }).catch(err => {
-        console.warn("Presence init error (checking permissions):", err.code);
-    });
+    }, { merge: true }).catch(() => {});
 
-    // 2. Heartbeat (every 30s)
+    // 2. High-frequency Heartbeat (Every 5 seconds)
+    // This ensures that if the user crashes/disconnects, the 8s window in the UI will expire quickly.
     const heartbeat = setInterval(() => {
         userRef.update({
-            lastSeen: timestamp(),
-            isOnline: true
+            isOnline: true,
+            lastSeen: timestamp()
         }).catch(err => {
-             // Silently fail if permissions are lost (e.g. token expired)
-             if(err.code !== 'permission-denied') console.error("Heartbeat error:", err);
+             // Suppress errors (e.g. if permissions lost during logout flow)
+             if(err.code !== 'permission-denied') console.warn("Heartbeat skipped");
         });
-    }, 30000);
+    }, 5000);
 
-    // 3. Set Offline on tab close / unload
+    // 3. Handle Tab Close / Refresh
     const handleTabClose = () => {
-        // This is best-effort as we can't await
+        // We can't await here, so we fire and forget
         userRef.update({
             isOnline: false,
             lastSeen: timestamp()
@@ -115,9 +113,9 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
     return () => {
         clearInterval(heartbeat);
         window.removeEventListener('beforeunload', handleTabClose);
-        // Note: We do NOT call setOffline here automatically. 
-        // If the component unmounts because of logout, we handle setOffline in the logout function 
-        // to avoid "Missing Permissions" errors after auth is cleared.
+        // Note: We don't automatically set offline in cleanup here to avoid 
+        // race conditions during page navigation. We rely on 'logout' function
+        // and 'beforeunload' for definitive offline states.
     };
   }, [user?.id]);
 
@@ -134,15 +132,11 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
       return true;
     } catch (error: any) {
       console.error("Login Error:", error.code);
-      
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      if (error.code === 'auth/invalid-credential') {
           showToast("Invalid email or password.", 'error');
-      } else if (error.code === 'auth/too-many-requests') {
-          showToast("Too many failed attempts. Please try again later.", 'error');
       } else {
           showToast(error.message || "Failed to login.", 'error');
       }
-      
       setIsLoading(false);
       return false;
     }
@@ -153,7 +147,6 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
     
     setIsLoading(true);
     try {
-      // 1. Create Auth User
       const userCredential = await auth.createUserWithEmailAndPassword(data.email, data.password);
       const uid = userCredential.user.uid;
       
@@ -169,20 +162,15 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
       
       delete newUser.password;
 
-      // 2. Save to Firestore (users/{uid})
-      // We do this immediately so when the onAuthStateChanged fires, data might be ready
       await firestore.collection("users").doc(uid).set({
         ...newUser,
         createdAt: timestamp()
       });
 
-      // Update state immediately to avoid race condition flicker
       setUser(newUser);
-      
       showToast("Account created successfully!", 'success');
       return true;
     } catch (error: any) {
-      console.error(error);
       if (error.code === 'auth/email-already-in-use') {
         showToast("Email already in use.", 'error');
       } else {
@@ -200,18 +188,15 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
       const firebaseUser = result.user;
       const uid = firebaseUser.uid;
       
-      // Check Firestore to see if we need to initialize this user with the chosen Role
       const userDocRef = firestore.collection("users").doc(uid);
-      
       try {
           const userDocSnap = await userDocRef.get();
-
           if (!userDocSnap.exists) {
             const newUser: User = {
                id: uid,
                name: firebaseUser.displayName || 'New User',
                email: firebaseUser.email || '',
-               role: role, // Use the role selected in the UI
+               role: role,
                avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.email}`,
                company: '',
             };
@@ -222,20 +207,13 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
             setUser(newUser);
           }
       } catch (e) {
-          // Ignore permission errors on google sign in fetch, handled by onAuthStateChanged fallback
           console.warn("Google Sign In: Firestore check failed, proceeding with auth only.");
       }
       
       showToast("Logged in with Google!", 'success');
       return true;
     } catch (error: any) {
-      console.error("Google Sign In Error:", error);
-      
-      if (error.code === 'auth/popup-closed-by-user') {
-        showToast("Sign in cancelled.", 'info');
-      } else {
-        showToast(error.message || "Google sign in failed.", 'error');
-      }
+      showToast(error.message || "Google sign in failed.", 'error');
       setIsLoading(false);
       return false;
     }
@@ -243,17 +221,13 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
   const updateProfile = async (data: Partial<User>): Promise<boolean> => {
     if (!user) return false;
-    
     const updatedUser = { ...user, ...data };
-    
     try {
-       // Always write to the user's document based on their current ID
        await firestore.collection("users").doc(user.id).set(updatedUser, { merge: true });
        setUser(updatedUser);
        showToast("Profile updated successfully.", 'success');
        return true;
     } catch (e: any) {
-       console.error("Error updating Firestore:", e);
        showToast("Failed to update profile.", 'error');
        return false;
     }
@@ -261,8 +235,9 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
   const logout = async () => {
     try {
-      // CRITICAL: Set offline status BEFORE signing out
-      // We must do this while we still have permissions
+      // CRITICAL: Set offline status BEFORE signing out.
+      // We explicitly wait for this to finish to ensure the DB is updated 
+      // while we still have an authenticated token.
       if (user?.id) {
           try {
             await firestore.collection("users").doc(user.id).update({
@@ -270,7 +245,7 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
                 lastSeen: timestamp()
             });
           } catch(e) {
-            console.warn("Could not set offline status (network or permission issue):", e);
+            console.warn("Could not set offline status (network or permission issue).");
           }
       }
 

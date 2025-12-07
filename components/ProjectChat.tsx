@@ -230,6 +230,9 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
   const [error, setError] = useState<string | null>(null);
   const [otherUserData, setOtherUserData] = useState<any>(null);
 
+  // Local ticker state to force re-render every second for strict presence timing
+  const [now, setNow] = useState(Date.now());
+
   const typingTimeoutRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -251,6 +254,12 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
 
   useEffect(() => { chatRoomRef.current = chatRoom; }, [chatRoom]);
   useEffect(() => { userRef.current = user; }, [user]);
+
+  // Update 'now' every second to keep freshness checks accurate
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Helper: Scroll to Bottom
   const scrollToBottom = () => {
@@ -312,37 +321,26 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
     };
   }, [project.id, user]);
 
-  // Force re-render every minute to update "last seen" text
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Listen for Other User Presence
+  // --- Real-time Presence Listener ---
   useEffect(() => {
     if (!user) return;
 
     let targetId: string | null = null;
 
-    // 1. Try to determine other user from ChatRoom (most accurate source of truth)
-    if (chatRoom) {
-        if (user.id === chatRoom.ownerId) {
-            targetId = chatRoom.freelancerId;
-        } else if (user.id === chatRoom.freelancerId) {
-            targetId = chatRoom.ownerId;
-        }
-    } 
-    // 2. Fallback to Project (if chatRoom not loaded yet or doesn't exist)
-    else if (project) {
-        const ownerId = project.ownerId || project.clientId;
-        if (user.id === ownerId) {
-            // If I am the owner, look for freelancer
-            targetId = project.freelancerId || null;
-        } else {
-            // If I am not the owner, the other person IS the owner
-            targetId = ownerId;
-        }
+    // Determine target ID strictly based on participants
+    const ownerId = chatRoom?.ownerId || project.ownerId || project.clientId;
+    const freelancerId = chatRoom?.freelancerId || project.freelancerId;
+
+    if (user.id === ownerId) {
+        // If I am the owner, I watch the freelancer
+        targetId = freelancerId || null;
+    } else if (user.id === freelancerId) {
+        // If I am the freelancer, I watch the owner
+        targetId = ownerId || null;
+    } else {
+        // Fallback for tricky states: If I'm not the owner, assume I'm watching the owner
+        // (e.g. before freelancerId is officially set in project schema)
+        targetId = ownerId || null;
     }
 
     if (!targetId) {
@@ -910,16 +908,17 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
   };
 
   // Determine Online Status
+  // Freshness Window: 8 seconds
+  // Ticker: 'now' state updates every second to force this calculation to run
   let statusText = "Offline";
   let isOnline = false;
 
   if (otherUserData) {
-      // Logic: A user is considered online if: isOnline === true OR lastSeen is within the past 60 seconds.
-      const lastSeenDate = otherUserData.lastSeen?.toDate ? otherUserData.lastSeen.toDate() : new Date(otherUserData.lastSeen || 0);
-      const diffSeconds = (new Date().getTime() - lastSeenDate.getTime()) / 1000;
+      const lastSeenMillis = otherUserData.lastSeen?.toMillis ? otherUserData.lastSeen.toMillis() : new Date(otherUserData.lastSeen || 0).getTime();
+      const diff = now - lastSeenMillis;
       
-      // If isOnline is true OR heartbeat was recent
-      if (otherUserData.isOnline || diffSeconds < 60) {
+      // Strict 8-second window for freshness OR direct boolean flag
+      if (otherUserData.isOnline || diff < 8000) {
           isOnline = true;
           statusText = "Online";
       } else {

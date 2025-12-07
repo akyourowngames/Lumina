@@ -14,6 +14,12 @@ export interface User {
   phone?: string;
   location?: string;
   password?: string;
+  
+  // New Profile Fields
+  headline?: string;
+  skills?: string[];
+  hourlyRate?: number;
+  profileRole?: 'client' | 'freelancer' | 'both';
 }
 
 export interface Project {
@@ -24,7 +30,7 @@ export interface Project {
   clientId: string; // User ID (Mapped from ownerId)
   ownerId?: string; // New: owner of the project
   freelancerId?: string | null; // New: assigned freelancer
-  status: 'Requested' | 'In Progress' | 'Completed' | 'Pending' | 'Assigned';
+  status: 'Requested' | 'In Progress' | 'Completed' | 'Pending' | 'Assigned' | 'Hired' | 'Submitted' | 'Cancelled';
   progress: number;
   dueDate: string; // Mapped from endDate for UI compat
   endDate?: string; // New schema field
