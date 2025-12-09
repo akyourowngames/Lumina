@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, LayoutDashboard, FileText, Home, Sparkles, LogIn, LogOut, CreditCard, User, Sun, Moon, Briefcase } from 'lucide-react';
+import { Menu, X, LayoutDashboard, FileText, Home, Sparkles, LogIn, LogOut, CreditCard, User, Sun, Moon, Briefcase, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../context/NotificationContext';
 import { Button } from './UI';
+import { NotificationDropdown } from './Notifications';
+import { NotificationToaster } from './NotificationToast';
 
 interface NavLinkProps {
   to: string;
@@ -31,9 +34,11 @@ const NavLink: React.FC<NavLinkProps> = ({ to, icon, text, isActive }) => (
 
 export const Layout = ({ children }: { children?: React.ReactNode }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { unreadCount } = useNotifications(); // Hook for unread badge
   const navigate = useNavigate();
 
   // Role Logic
@@ -62,6 +67,9 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white relative overflow-hidden transition-colors duration-300">
+      {/* Toast Overlay */}
+      <NotificationToaster />
+
       {/* Background Blobs - Adjusted opacity for light mode */}
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary/10 dark:bg-primary/20 rounded-full blur-3xl animate-blob" />
@@ -100,6 +108,23 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
 
             {user ? (
               <div className="flex items-center gap-4 pl-4 border-l border-slate-200 dark:border-white/10">
+                 {/* Notification Bell */}
+                 <div className="relative">
+                   <button 
+                      onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                      className={`p-2 rounded-lg transition-colors relative ${isNotificationsOpen ? 'bg-primary/10 text-primary' : 'text-gray-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                   >
+                     <Bell size={20} />
+                     {unreadCount > 0 && (
+                       <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-slate-950 animate-pulse" />
+                     )}
+                   </button>
+                   <NotificationDropdown 
+                      isOpen={isNotificationsOpen} 
+                      onClose={() => setIsNotificationsOpen(false)} 
+                   />
+                 </div>
+
                  <Link to="/profile" className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white transition-colors group">
                     <div className="relative">
                       <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full border border-slate-200 dark:border-white/10 group-hover:border-primary transition-colors object-cover" />
@@ -161,6 +186,14 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
 
               {user ? (
                 <>
+                  <Link 
+                    to="/notifications"
+                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 text-gray-600 dark:text-gray-300"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <Bell size={18} /> Notifications
+                    {unreadCount > 0 && <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>}
+                  </Link>
                   <Link 
                     to="/profile"
                     className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 text-gray-600 dark:text-gray-300"

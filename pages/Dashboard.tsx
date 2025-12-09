@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
-import { GlassCard, Badge, Button, PageWrapper, Input, Modal } from '../components/UI';
-import { Clock, CheckCircle2, DollarSign, TrendingUp, Users, FileText, Bell, Plus, X, MessageSquare } from 'lucide-react';
+import { GlassCard, Badge, Button, PageWrapper, Input, Modal, AnimatedCounter, EmptyState } from '../components/UI';
+import { Clock, CheckCircle2, DollarSign, TrendingUp, Users, FileText, Bell, Plus, X, MessageSquare, Loader2, CheckSquare } from 'lucide-react';
 import { Task } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
@@ -40,13 +40,16 @@ export const Dashboard = () => {
   const { showToast } = useToast();
   
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [isAddingTask, setIsAddingTask] = useState(false);
 
   // Fetch Tasks
   useEffect(() => {
     const fetchTasks = async () => {
         if (!user) return;
+        setIsLoadingTasks(true);
         try {
             const tasksRef = firestore.collection('users').doc(user.id).collection('tasks');
             const snapshot = await tasksRef.limit(10).get();
@@ -70,6 +73,8 @@ export const Dashboard = () => {
             setTasks(fetchedTasks.slice(0, 5));
         } catch (e) {
             console.error(e);
+        } finally {
+            setIsLoadingTasks(false);
         }
     };
     fetchTasks();
@@ -79,6 +84,7 @@ export const Dashboard = () => {
     e.preventDefault();
     if (!user || !newTaskTitle) return;
 
+    setIsAddingTask(true);
     try {
         await firestore.collection('users').doc(user.id).collection('tasks').add({
             title: newTaskTitle,
@@ -92,6 +98,8 @@ export const Dashboard = () => {
         setNewTaskTitle('');
     } catch (e) {
         showToast("Failed to add task", "error");
+    } finally {
+        setIsAddingTask(false);
     }
   };
 
@@ -123,7 +131,7 @@ export const Dashboard = () => {
              >
                {isAdmin ? 'Admin Dashboard' : 'Client Portal'}
              </motion.h1>
-             <p className="text-slate-600 dark:text-gray-400">Welcome back, {user?.name}. Here's what's happening today.</p>
+             <p className="text-slate-600 dark:text-gray-400 mt-1">Welcome back, {user?.name}. Here's what's happening today.</p>
           </div>
           <div className="flex gap-3">
             <Link to="/messages">
@@ -153,7 +161,9 @@ export const Dashboard = () => {
                   <div className="p-2 bg-slate-100 dark:bg-white/5 rounded-lg">{stat.icon}</div>
                 </div>
                 <div className="flex items-end gap-2">
-                  <div className="text-3xl font-bold font-display text-slate-900 dark:text-white">{stat.val}</div>
+                  <div className="text-3xl font-bold font-display text-slate-900 dark:text-white">
+                      <AnimatedCounter value={stat.val} />
+                  </div>
                   {isAdmin && stat.change && (
                     <span className="text-xs font-bold text-green-500 dark:text-green-400 mb-1 bg-green-500/10 dark:bg-green-400/10 px-1.5 py-0.5 rounded">{stat.change}</span>
                   )}
@@ -166,7 +176,7 @@ export const Dashboard = () => {
                 key={i}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
+                transition={{ delay: i * 0.1, type: "spring", stiffness: 300, damping: 24 }}
               >
                 {stat.link ? (
                   <Link to={stat.link}>{Content}</Link>
@@ -180,7 +190,12 @@ export const Dashboard = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Chart Section */}
-          <div className="lg:col-span-2">
+          <motion.div 
+            className="lg:col-span-2"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
             <GlassCard className="h-full min-h-[400px]">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{isAdmin ? 'Revenue Overview' : 'Project Progress'}</h2>
@@ -216,55 +231,71 @@ export const Dashboard = () => {
                 </ResponsiveContainer>
               </div>
             </GlassCard>
-          </div>
+          </motion.div>
 
           {/* Side Panel (Tasks) */}
-          <div className="lg:col-span-1">
-            <GlassCard className="h-full">
-              <div className="flex justify-between items-center mb-6">
+          <motion.div 
+            className="lg:col-span-1"
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <GlassCard className="h-full flex flex-col">
+              <div className="flex justify-between items-center mb-6 shrink-0">
                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">Recent Tasks</h2>
-                 <button onClick={() => setIsTaskModalOpen(true)} className="p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded">
+                 <button onClick={() => setIsTaskModalOpen(true)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-colors">
                     <Plus size={18} />
                  </button>
               </div>
               
-              <div className="space-y-4">
-                {tasks.length === 0 && <p className="text-sm text-gray-500">No tasks found. Add one!</p>}
-                {tasks.map((task, i) => (
-                  <motion.div
-                    key={task.id}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 + (i * 0.1) }}
-                    className="p-4 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors group cursor-pointer"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="font-medium text-sm text-slate-700 dark:text-gray-200">{task.title}</span>
-                      <Badge color={task.status === 'Done' ? 'green' : task.status === 'In Progress' ? 'blue' : 'purple'}>
-                        {task.status}
-                      </Badge>
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2 space-y-3 min-h-[200px]">
+                {isLoadingTasks ? (
+                    <div className="flex justify-center py-10"><Loader2 className="animate-spin text-primary" /></div>
+                ) : tasks.length === 0 ? (
+                    <div className="h-full flex items-center justify-center">
+                        <EmptyState 
+                            icon={<CheckSquare size={32} />}
+                            title="No Tasks"
+                            description="You're all caught up!"
+                        />
                     </div>
-                    <div className="flex justify-between items-center text-xs text-slate-500 dark:text-gray-400">
-                      <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-[10px] text-white font-bold">
-                          {task.assignee?.charAt(0) || 'U'}
+                ) : (
+                    tasks.map((task, i) => (
+                      <motion.div
+                        key={task.id}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2 + (i * 0.1) }}
+                        className="p-4 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors group cursor-pointer"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="font-medium text-sm text-slate-700 dark:text-gray-200">{task.title}</span>
+                          <Badge color={task.status === 'Done' ? 'green' : task.status === 'In Progress' ? 'blue' : 'purple'}>
+                            {task.status}
+                          </Badge>
                         </div>
-                        <span>{task.assignee}</span>
-                      </div>
-                      <span className={`px-2 py-0.5 rounded ${task.priority === 'High' ? 'text-red-500 dark:text-red-400 bg-red-500/10' : 'text-slate-400 dark:text-gray-400'}`}>
-                        {task.priority}
-                      </span>
-                    </div>
-                  </motion.div>
-                ))}
+                        <div className="flex justify-between items-center text-xs text-slate-500 dark:text-gray-400">
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-[10px] text-white font-bold">
+                              {task.assignee?.charAt(0) || 'U'}
+                            </div>
+                            <span>{task.assignee}</span>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded ${task.priority === 'High' ? 'text-red-500 dark:text-red-400 bg-red-500/10' : 'text-slate-400 dark:text-gray-400'}`}>
+                            {task.priority}
+                          </span>
+                        </div>
+                      </motion.div>
+                    ))
+                )}
               </div>
-              <div className="mt-6">
+              <div className="mt-6 pt-4 border-t border-slate-200 dark:border-white/10 shrink-0">
                  <Link to="/projects">
-                   <Button variant="outline" className="w-full text-sm">View All Projects</Button>
+                   <Button variant="outline" className="w-full text-sm h-10">View All Projects</Button>
                  </Link>
               </div>
             </GlassCard>
-          </div>
+          </motion.div>
         </div>
 
         {/* Add Task Modal */}
@@ -281,10 +312,11 @@ export const Dashboard = () => {
                         placeholder="Task Title" 
                         value={newTaskTitle} 
                         onChange={e => setNewTaskTitle(e.target.value)} 
+                        disabled={isAddingTask}
                     />
-                    <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" onClick={() => setIsTaskModalOpen(false)}>Cancel</Button>
-                        <Button type="submit">Add Task</Button>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button type="button" variant="ghost" onClick={() => setIsTaskModalOpen(false)} disabled={isAddingTask}>Cancel</Button>
+                        <Button type="submit" isLoading={isAddingTask}>Add Task</Button>
                     </div>
                 </form>
             </div>

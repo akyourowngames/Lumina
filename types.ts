@@ -3,6 +3,29 @@ import React from 'react';
 export type Role = 'admin' | 'client';
 export type Theme = 'dark' | 'light';
 
+export type NotificationType = 'message' | 'project' | 'application' | 'invoice' | 'system' | 'success' | 'alert';
+
+export interface AppNotification {
+  id: string;
+  userId: string; // Recipient ID
+  type: NotificationType;
+  title: string;
+  body: string;
+  isRead: boolean;
+  createdAt: any; // Firestore Timestamp or string
+  link?: string; // Direct URL to navigate to
+  sender?: {
+    name: string;
+    avatar?: string;
+  };
+  metadata?: {
+    projectId?: string;
+    applicationId?: string;
+    invoiceId?: string;
+    freelancerId?: string;
+  };
+}
+
 export interface PortfolioItem {
   id: string;
   title: string;
@@ -41,6 +64,10 @@ export interface User {
   github?: string;
   twitter?: string;
   linkedin?: string;
+  
+  // Presence
+  isOnline?: boolean;
+  lastSeen?: any;
 }
 
 export interface Project {

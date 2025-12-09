@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, User as UserIcon, Loader2, Lock, AlertCircle, Paperclip, File as FileIcon, Image as ImageIcon, Download, Check, CheckCheck, FileText, FileArchive, FileVideo, FileAudio, Mic, StopCircle, Play, Pause, ArrowDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { firestore, timestamp } from '../services/firebase';
 import { supabase } from '../services/supabaseClient';
-import { Button, Input } from './UI';
+import { createNotification } from '../services/notifications';
+import { Button } from './UI';
 import { Project } from '../types';
 import { useToast } from '../context/ToastContext';
 
@@ -86,17 +87,37 @@ const formatLastSeen = (timestamp: any) => {
 };
 
 // Custom Audio Player Component
-const AudioMessage = ({ src, duration: initialDuration, isMe }: { src: string, duration?: number, isMe: boolean }) => {
+const AudioMessage = ({ src, duration: initialDuration, isMe, id }: { src: string, duration?: number, isMe: boolean, id?: string }) => {
     const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(initialDuration || 0);
+    const [playbackRate, setPlaybackRate] = useState(1);
+    const [isHovered, setIsHovered] = useState(false);
+
+    // Generate waveform data
+    // Creates a consistent "fake" waveform based on the message ID to look authentic
+    const bars = 32;
+    const barHeights = useMemo(() => {
+        const heights = [];
+        let seed = 0;
+        const seedStr = id || 'default';
+        for(let i=0; i<seedStr.length; i++) seed += seedStr.charCodeAt(i);
+        
+        for(let i=0; i<bars; i++) {
+             // Combine sine waves and pseudorandomness for a natural look
+             const base = Math.sin((i / bars) * Math.PI); // Arch shape
+             const noise = Math.abs(Math.sin(seed + i * 13.5)); // Randomness
+             const h = Math.max(20, (base * 0.6 + noise * 0.4) * 100);
+             heights.push(h);
+        }
+        return heights;
+    }, [id]);
 
     useEffect(() => {
         const audio = audioRef.current;
         if (!audio) return;
 
-        // If metadata loads and we don't have a duration from props, update it
         const onLoadedMetadata = () => {
             if (!initialDuration && audio.duration !== Infinity && !isNaN(audio.duration)) {
                 setDuration(audio.duration);
@@ -123,8 +144,14 @@ const AudioMessage = ({ src, duration: initialDuration, isMe }: { src: string, d
         };
     }, [initialDuration]);
 
+    useEffect(() => {
+        if(audioRef.current) {
+            audioRef.current.playbackRate = playbackRate;
+        }
+    }, [playbackRate, isPlaying]);
+
     const togglePlay = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent message bubble click
+        e.stopPropagation(); 
         if (!audioRef.current) return;
         
         if (isPlaying) {
@@ -140,13 +167,18 @@ const AudioMessage = ({ src, duration: initialDuration, isMe }: { src: string, d
         if (!audioRef.current || !duration) return;
         
         const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const width = rect.width;
-        const percentage = Math.min(Math.max(x / width, 0), 1);
+        const percent = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+        const newTime = percent * duration;
         
-        const newTime = percentage * duration;
         audioRef.current.currentTime = newTime;
         setCurrentTime(newTime);
+    };
+
+    const toggleSpeed = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const rates = [1, 1.5, 2];
+        const nextIdx = (rates.indexOf(playbackRate) + 1) % rates.length;
+        setPlaybackRate(rates[nextIdx]);
     };
 
     const formatTime = (time: number) => {
@@ -157,59 +189,80 @@ const AudioMessage = ({ src, duration: initialDuration, isMe }: { src: string, d
     };
 
     // Styling configuration
-    // Inner bubble style (Glass effect for sender, Card for receiver)
     const containerClass = isMe 
-        ? "bg-white/10 border border-white/20" 
-        : "bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10";
+        ? "bg-white/10" 
+        : "bg-slate-100 dark:bg-black/20";
     
-    // Icon background styling
-    const iconBg = isMe 
-        ? "bg-white/20 text-white" 
-        : "bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300";
+    // Play button
+    const playBtnClass = isMe 
+        ? "bg-white text-primary hover:bg-white/90" 
+        : "bg-primary text-white hover:bg-primary/90";
 
-    const textPrimary = isMe ? "text-white" : "text-slate-900 dark:text-white";
-    // Small semi-bold white opacity 80% for duration
-    const textSecondary = isMe ? "text-white/80" : "text-slate-500 dark:text-gray-400";
-    
-    // Progress bar colors
-    const trackColor = isMe ? "bg-white/30" : "bg-slate-200 dark:bg-white/10";
-    const progressFill = isMe ? "bg-white" : "bg-purple-500";
+    // Text colors
+    const textMain = isMe ? "text-white" : "text-slate-900 dark:text-white";
+    const textSub = isMe ? "text-indigo-100/80" : "text-slate-500 dark:text-gray-400";
+    const speedBtnClass = isMe 
+        ? "bg-white/20 text-white hover:bg-white/30" 
+        : "bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-gray-300 hover:bg-slate-300 dark:hover:bg-white/20";
 
     return (
-        <div className={`flex items-start gap-[10px] p-3 rounded-xl min-w-[240px] transition-all duration-300 ${containerClass}`}>
-            {/* Mic Icon (Left) */}
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${iconBg}`}>
-                <Mic size={20} />
+        <div 
+            className={`flex flex-col gap-2 p-3 rounded-xl min-w-[260px] sm:min-w-[280px] max-w-full transition-colors duration-300 ${containerClass}`}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            <div className="flex items-center gap-3">
+                {/* Play/Pause Button */}
+                <button 
+                    onClick={togglePlay}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-sm transition-all active:scale-95 ${playBtnClass}`}
+                >
+                    {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
+                </button>
+
+                {/* Waveform Visualization */}
+                <div 
+                    className="flex-1 h-8 flex items-center justify-between gap-[2px] cursor-pointer relative group/waveform"
+                    onClick={handleSeek}
+                >
+                    {/* Invisible overlay for easier clicking */}
+                    <div className="absolute inset-0 z-10 w-full h-full" />
+                    
+                    {barHeights.map((height, i) => {
+                        const percent = i / bars;
+                        const currentPercent = currentTime / (duration || 1);
+                        const isPlayed = percent <= currentPercent;
+                        
+                        return (
+                            <div 
+                                key={i}
+                                className={`w-1 rounded-full transition-all duration-150 ${
+                                    isMe 
+                                      ? (isPlayed ? 'bg-white' : 'bg-white/30') 
+                                      : (isPlayed ? 'bg-primary' : 'bg-primary/20')
+                                }`}
+                                style={{ 
+                                    height: `${height}%`,
+                                    transform: isHovered && isPlayed ? 'scaleY(1.1)' : 'scaleY(1)'
+                                }}
+                            />
+                        );
+                    })}
+                </div>
             </div>
 
-            {/* Content (Right) */}
-            <div className="flex-1 min-w-0 flex flex-col justify-center h-full pt-1">
-                {/* Row 1: Play + Progress */}
-                <div className="flex items-center gap-3 mb-1.5">
-                    <button 
-                        onClick={togglePlay}
-                        className={`transition-transform active:scale-95 focus:outline-none ${textPrimary} hover:opacity-80`}
-                    >
-                        {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
-                    </button>
+            {/* Footer: Time & Speed */}
+            <div className="flex justify-between items-center px-1">
+                 <span className={`text-[10px] font-medium tracking-wide tabular-nums ${textSub}`}>
+                    {formatTime(currentTime)} <span className="opacity-50 mx-1">/</span> {formatTime(duration)}
+                 </span>
 
-                    {/* Progress Bar (h-1 = 4px) */}
-                    <div 
-                        className={`relative h-1 flex-1 rounded-full overflow-hidden cursor-pointer group ${trackColor}`}
-                        onClick={handleSeek}
-                    >
-                        <motion.div 
-                            className={`absolute top-0 left-0 h-full rounded-full ${progressFill}`}
-                            style={{ width: `${(currentTime / duration) * 100}%` }}
-                            transition={{ type: 'tween', ease: 'linear', duration: 0.1 }}
-                        />
-                    </div>
-                </div>
-                
-                {/* Row 2: Duration (Below, Right Aligned) */}
-                <div className={`flex justify-end text-[10px] font-semibold ${textSecondary}`}>
-                     {formatTime(isPlaying ? currentTime : duration || 0)}
-                </div>
+                 <button 
+                    onClick={toggleSpeed}
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors ${speedBtnClass}`}
+                 >
+                    {playbackRate}x
+                 </button>
             </div>
             
             <audio ref={audioRef} src={src} className="hidden" />
@@ -224,7 +277,7 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -263,10 +316,13 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
 
   // Helper: Scroll to Bottom
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    setHasNewMessages(false);
-    setIsAtBottom(true);
-    isAtBottomRef.current = true;
+    // Check if element exists before scrolling
+    if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        setHasNewMessages(false);
+        setIsAtBottom(true);
+        isAtBottomRef.current = true;
+    }
   };
 
   // Helper: Handle Scroll
@@ -274,8 +330,8 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
     if (!scrollRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
     
-    // Check if within 40px of bottom
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 40;
+    // Check if within 50px of bottom
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 50;
     
     setIsAtBottom(isNearBottom);
     isAtBottomRef.current = isNearBottom;
@@ -310,7 +366,6 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
              setChatRoom(null);
              setError(null);
         } else {
-             console.error("Error fetching chat room:", err);
              setError("Unable to load chat.");
         }
         setLoading(false);
@@ -338,8 +393,6 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
         // If I am the freelancer, I watch the owner
         targetId = ownerId || null;
     } else {
-        // Fallback for tricky states: If I'm not the owner, assume I'm watching the owner
-        // (e.g. before freelancerId is officially set in project schema)
         targetId = ownerId || null;
     }
 
@@ -355,7 +408,7 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
             setOtherUserData(null);
         }
     }, err => {
-        console.error("Error fetching presence:", err);
+        // Silent error
     });
 
     return () => unsub();
@@ -379,9 +432,7 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
                 if (role) {
                     const field = role === 'owner' ? 'ownerTyping' : 'freelancerTyping';
                     firestore.collection('chats').doc(currentChat.id).update({ [field]: false })
-                        .catch(err => {
-                            if (err.code !== 'permission-denied') console.error("Unmount cleanup failed:", err.code);
-                        });
+                        .catch(err => {});
                 }
             }
         }
@@ -393,14 +444,13 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
     };
   }, []);
 
-  // 2. Listen for Messages
+  // 2. Listen for messages
   useEffect(() => {
     if (!chatRoom) {
         setMessages([]);
         return;
     }
 
-    // Path: /chats/{projectId}/messages
     const messagesRef = firestore.collection('chats').doc(chatRoom.id).collection('messages');
     const q = messagesRef.orderBy('timestamp', 'asc').limit(100);
 
@@ -410,10 +460,7 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
         ...doc.data()
       })) as Message[];
       setMessages(msgs);
-      
-      // Note: Auto-scroll logic moved to separate useEffect on [messages]
     }, (err) => {
-        console.error("Snapshot error:", err);
         if (err.code === 'permission-denied') {
             setError("Access denied to messages.");
         }
@@ -426,39 +473,30 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
   useEffect(() => {
     if (!chatRoom || !user || messages.length === 0) return;
 
-    // Determine my role
     let myRole: 'owner' | 'freelancer' | null = null;
     if (user.id === chatRoom.ownerId) myRole = 'owner';
     else if (user.id === chatRoom.freelancerId) myRole = 'freelancer';
 
     if (!myRole) return;
 
-    // Get the last message ID
     const lastMessage = messages[messages.length - 1];
-    
-    // Field to update
     const fieldName = myRole === 'owner' ? 'lastSeenByOwner' : 'lastSeenByFreelancer';
     const currentSeenId = myRole === 'owner' ? chatRoom.lastSeenByOwner : chatRoom.lastSeenByFreelancer;
 
-    // Only update if it's different to prevent loops
     if (currentSeenId !== lastMessage.id) {
         firestore.collection('chats').doc(chatRoom.id).update({
             [fieldName]: lastMessage.id
-        }).catch(err => {
-            // Ignore permission errors or offline errors usually
-            console.error("Failed to update seen status", err);
-        });
+        }).catch(err => {});
     }
   }, [chatRoom, user, messages]);
 
-  // 4. Auto-Scroll Logic for New Messages
-  useEffect(() => {
+  // 4. Auto-Scroll Logic using LayoutEffect for smoothness
+  useLayoutEffect(() => {
     if (messages.length === 0) return;
 
     const lastMsg = messages[messages.length - 1];
     const isOwnMessage = lastMsg?.senderId === user?.id;
 
-    // Scroll if we are already at bottom OR if we just sent the message
     if (isAtBottomRef.current || isOwnMessage) {
         scrollToBottom();
     } else {
@@ -476,21 +514,15 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
         role = 'freelancer';
     }
     
-    // If not a participant, do nothing
     if (!role) return;
 
-    // Determine field based on role
     const field = role === 'owner' ? 'ownerTyping' : 'freelancerTyping';
 
     try {
         await firestore.collection('chats').doc(chatRoom.id).update({
             [field]: isTyping
         });
-    } catch (err: any) {
-        if (err.code !== 'permission-denied') {
-            console.error("Failed to update typing status:", err.code);
-        }
-    }
+    } catch (err: any) {}
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -500,14 +532,11 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
     if (!user || !chatRoom) return;
 
     if (!typingTimeoutRef.current) {
-        // Start typing
         updateTypingStatus(true);
     } else {
-        // Reset timeout
         clearTimeout(typingTimeoutRef.current);
     }
 
-    // Set debounce to stop typing
     typingTimeoutRef.current = setTimeout(() => {
         updateTypingStatus(false);
         typingTimeoutRef.current = null;
@@ -516,21 +545,20 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
 
   const handleStartChat = async () => {
     if (!user || !project) return;
-    setSending(true);
+    setIsSending(true);
     setError(null);
     try {
         const projectOwnerId = project.ownerId || project.clientId;
         let chatOwnerId = projectOwnerId;
         let chatFreelancerId = project.freelancerId;
 
-        // If current user is not the owner, they are the freelancer
         if (user.id !== projectOwnerId) {
              chatFreelancerId = user.id;
         }
 
         if (!chatOwnerId) {
              setError("Cannot start chat: Owner information missing.");
-             setSending(false);
+             setIsSending(false);
              return;
         }
 
@@ -567,186 +595,49 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
         }
         
     } catch (e: any) {
-        console.error("Error starting chat:", e);
         if (e.code === 'permission-denied') {
             setError("Permission denied: You cannot create this chat.");
         } else {
             setError("Failed to create chat room.");
         }
     } finally {
-        setSending(false);
+        setIsSending(false);
     }
   };
 
-  // --- Voice Message Logic ---
+  // --- Notification Helper ---
+  const sendChatNotification = async (textSnippet: string, type: 'message' | 'file' | 'audio' = 'message') => {
+      if (!user || !chatRoomRef.current) return;
+      const currentChat = chatRoomRef.current;
+      
+      const recipientId = user.id === currentChat.ownerId ? currentChat.freelancerId : currentChat.ownerId;
+      if (!recipientId) return;
 
-  const getAudioDuration = (blob: Blob): Promise<number> => {
-    return new Promise((resolve) => {
-        const audio = document.createElement('audio');
-        const url = URL.createObjectURL(blob);
-        audio.src = url;
-        audio.preload = 'metadata';
-        audio.onloadedmetadata = () => {
-            if (audio.duration === Infinity) {
-                 // Hack for Chrome/WebM bug
-                 audio.currentTime = 1e101;
-                 audio.ontimeupdate = function () {
-                      this.ontimeupdate = null;
-                      resolve(audio.duration);
-                      audio.currentTime = 0;
-                 }
-            } else {
-                resolve(audio.duration);
-            }
-        };
-        audio.onerror = () => resolve(0);
-    });
-  };
-
-  const handleAudioUpload = async () => {
-    if (!user || !chatRoomRef.current || audioChunksRef.current.length === 0) return;
-    const currentChat = chatRoomRef.current;
-
-    setIsUploading(true);
-    try {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const duration = await getAudioDuration(audioBlob);
-        
-        const fileName = `voice-message-${Date.now()}.webm`;
-        const filePath = `chat-attachments/${currentChat.id}/${fileName}`;
-
-        // Upload
-        const { error: uploadError } = await supabase.storage
-            .from('File')
-            .upload(filePath, audioBlob);
-
-        if (uploadError) throw uploadError;
-
-        // Get URL
-        const { data: { publicUrl } } = supabase.storage
-            .from('File')
-            .getPublicUrl(filePath);
-
-        // Save Message
-        const messagesRef = firestore.collection('chats').doc(currentChat.id).collection('messages');
-        await messagesRef.add({
-            type: 'audio',
-            audioUrl: publicUrl,
-            fileName: fileName,
-            duration: Math.round(duration) || 0,
-            senderId: user.id,
-            senderRole: user.role,
-            ownerId: currentChat.ownerId || '',
-            freelancerId: currentChat.freelancerId || '',
-            projectId: currentChat.projectId,
-            timestamp: timestamp()
-        });
-
-    } catch (error: any) {
-        console.error("Audio upload failed:", error);
-        showToast("Failed to send voice message.", "error");
-    } finally {
-        setIsUploading(false);
-    }
-  };
-
-  const startRecording = async () => {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showToast("Audio recording not supported.", "error");
-        return;
-    }
-    
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const recorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = recorder;
-        audioChunksRef.current = [];
-
-        recorder.ondataavailable = (e) => {
-            if (e.data.size > 0) audioChunksRef.current.push(e.data);
-        };
-
-        recorder.onstop = () => {
-            handleAudioUpload();
-            stream.getTracks().forEach(track => track.stop());
-        };
-
-        recorder.start();
-        setIsRecording(true);
-    } catch (err) {
-        console.error("Mic error:", err);
-        showToast("Microphone access denied.", "error");
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
-        setIsRecording(false);
-    }
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user || !chatRoom) return;
-
-    setIsUploading(true);
-    try {
-        // 1. Upload File to Supabase
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${chatRoom.id}/${fileName}`;
-
-        // Using "File" bucket as requested
-        const { data, error: uploadError } = await supabase.storage
-            .from('File')
-            .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        // 2. Get Public URL
-        const { data: { publicUrl } } = supabase.storage
-            .from('File')
-            .getPublicUrl(filePath);
-
-        // 3. Save Message to Firestore
-        const messagesRef = firestore.collection('chats').doc(chatRoom.id).collection('messages');
-        await messagesRef.add({
-            type: 'file',
-            fileUrl: publicUrl,
-            fileName: file.name,
-            fileSize: file.size,
-            fileType: file.type,
-            senderId: user.id,
-            senderRole: user.role,
-            ownerId: chatRoom.ownerId || '',
-            freelancerId: chatRoom.freelancerId || '',
-            projectId: chatRoom.projectId,
-            timestamp: timestamp()
-        });
-        
-    } catch (error: any) {
-        console.error("File upload failed:", error);
-        // Better error message formatting
-        const errorMessage = error.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
-        showToast(`Failed to upload file: ${errorMessage}`, "error");
-    } finally {
-        setIsUploading(false);
-        // Clear input so same file can be selected again if needed
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-    }
+      const title = type === 'message' ? `New message from ${user.name}` : type === 'file' ? `File sent by ${user.name}` : `Voice message from ${user.name}`;
+      
+      createNotification(
+          recipientId,
+          'message',
+          title,
+          textSnippet,
+          '/messages', // Link to messages dashboard
+          { name: user.name, avatar: user.avatar },
+          { projectId: currentChat.projectId }
+      );
+      
+      firestore.collection('projects').doc(currentChat.projectId)
+          .update({ updatedAt: timestamp() })
+          .catch(e => {});
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || !chatRoom) return;
+    if (!newMessage.trim() || !user || !chatRoom || isSending) return;
 
     const text = newMessage.trim();
     setNewMessage(''); // Optimistic clear
+    setIsSending(true);
 
-    // Clear typing status immediately
     if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = null;
@@ -766,21 +657,19 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
         projectId: chatRoom.projectId,
         timestamp: timestamp()
       });
+
+      sendChatNotification(text.substring(0, 100) + (text.length > 100 ? '...' : ''), 'message');
+
     } catch (error: any) {
-      console.error("Error sending message:", error);
       setNewMessage(text); // Revert on fail
       if (error.code === 'permission-denied') {
         showToast("Message failed to send: Permission denied.", "error");
       }
+    } finally {
+        setIsSending(false);
+        // Force scroll update after sending
+        setTimeout(scrollToBottom, 100);
     }
-  };
-
-  const formatFileSize = (bytes?: number) => {
-    if (!bytes) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
   // Determine if the OTHER party is typing
@@ -804,9 +693,18 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
     }
   }
 
-  // Calculate the index of the message the other user last saw
-  // This logic works because 'messages' is sorted by timestamp asc
   const otherSeenIndex = messages.findIndex(m => m.id === otherLastSeenId);
+
+  const renderAudioContent = (msg: Message, isMe: boolean) => {
+    return (
+        <AudioMessage 
+            src={msg.audioUrl || msg.fileUrl || ''} 
+            duration={msg.duration} 
+            isMe={isMe} 
+            id={msg.id}
+        />
+    );
+  };
 
   const renderFileContent = (msg: Message, isMe: boolean) => {
     const { fileType, fileName, fileSize, fileUrl } = msg;
@@ -818,13 +716,15 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
     const textClass = isMe ? "text-white" : "text-slate-900 dark:text-white";
     const subTextClass = isMe ? "text-indigo-100" : "text-slate-500 dark:text-gray-400";
 
-    // 1. Image
     if (fileType?.startsWith('image/')) {
         return (
             <div className="relative group">
                 <img 
                     src={fileUrl} 
                     alt={fileName} 
+                    onLoad={() => {
+                         if (isAtBottomRef.current) scrollToBottom();
+                    }}
                     className="rounded-xl max-h-[300px] w-auto object-cover" 
                 />
                  <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg flex items-center gap-1.5 shadow-lg pointer-events-none">
@@ -843,7 +743,6 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
         );
     }
 
-    // Common structure for non-image files
     let icon = <FileIcon size={24} className={isMe ? "text-white" : "text-slate-400"} />;
     let badgeText = "File";
     let badgeColorClass = isMe 
@@ -854,27 +753,15 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
         icon = <FileText size={24} className={isMe ? "text-white" : "text-red-500"} />;
         badgeText = "PDF File";
         if (!isMe) badgeColorClass = "bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-300";
-    } else if (fileType === 'application/zip' || fileType === 'application/x-zip-compressed') {
-        icon = <FileArchive size={24} className={isMe ? "text-white" : "text-yellow-500"} />;
-        badgeText = "ZIP Archive";
-        if (!isMe) badgeColorClass = "bg-yellow-100 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-300";
-    } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-        icon = <FileText size={24} className={isMe ? "text-white" : "text-blue-500"} />;
-        badgeText = "Document";
-        if (!isMe) badgeColorClass = "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300";
-    } else if (fileType?.startsWith('video/')) {
-        icon = <FileVideo size={24} className={isMe ? "text-white" : "text-purple-500"} />;
-        badgeText = "Video";
-        if (!isMe) badgeColorClass = "bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300";
-    } else if (fileType?.startsWith('audio/')) {
-        icon = <FileAudio size={24} className={isMe ? "text-white" : "text-pink-500"} />;
-        badgeText = "Audio";
-        if (!isMe) badgeColorClass = "bg-pink-100 dark:bg-pink-500/20 text-pink-600 dark:text-pink-300";
-    } else if (fileType === 'text/plain') {
-        icon = <FileText size={24} className={isMe ? "text-white" : "text-slate-500"} />;
-        badgeText = "Text";
-        if (!isMe) badgeColorClass = "bg-slate-200 dark:bg-slate-600/20 text-slate-600 dark:text-slate-300";
     }
+
+    const formatFileSize = (bytes?: number) => {
+        if (!bytes) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    };
 
     return (
         <div className={`flex items-start gap-3 p-3 rounded-xl transition-all duration-300 ${innerCardClass} min-w-[220px]`}>
@@ -903,21 +790,12 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
     );
   };
 
-  const renderAudioContent = (msg: Message, isMe: boolean) => {
-    return <AudioMessage src={msg.audioUrl || ''} duration={msg.duration} isMe={isMe} />;
-  };
-
-  // Determine Online Status
-  // Freshness Window: 8 seconds
-  // Ticker: 'now' state updates every second to force this calculation to run
   let statusText = "Offline";
   let isOnline = false;
 
   if (otherUserData) {
       const lastSeenMillis = otherUserData.lastSeen?.toMillis ? otherUserData.lastSeen.toMillis() : new Date(otherUserData.lastSeen || 0).getTime();
       const diff = now - lastSeenMillis;
-      
-      // Strict 8-second window for freshness OR direct boolean flag
       if (otherUserData.isOnline || diff < 8000) {
           isOnline = true;
           statusText = "Online";
@@ -954,31 +832,20 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
         <p className="text-slate-500 max-w-xs">
             Connect directly regarding <strong>{project.title}</strong>.
         </p>
-        <Button onClick={handleStartChat} isLoading={sending}>
+        <Button onClick={handleStartChat} isLoading={isSending}>
             Create Chat Room
         </Button>
       </div>
     );
   }
 
-  if (chatRoom.active === false) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-center p-8">
-        <Lock size={48} className="text-slate-300 dark:text-gray-600 mb-4" />
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white">Chat Archived</h3>
-        <p className="text-slate-500">This conversation has been closed.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col h-[600px] md:h-full bg-slate-50/50 dark:bg-slate-900/50 rounded-2xl overflow-hidden relative border border-slate-200 dark:border-white/5">
+    <div className="flex flex-col h-[600px] md:h-full bg-slate-50/50 dark:bg-slate-900/50 rounded-2xl overflow-hidden relative border border-slate-200 dark:border-white/5 shadow-sm">
         {/* Header */}
         <div className="absolute top-0 left-0 right-0 p-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-white/10 z-10 flex justify-between items-center">
             <div>
                 <span className="text-xs font-bold text-primary uppercase tracking-wider">Project Chat</span>
                 <h4 className="text-sm font-medium text-slate-900 dark:text-white truncate max-w-[200px]">{project.title}</h4>
-                {/* Presence Indicator */}
                 <div className="flex items-center gap-1.5 mt-0.5">
                     <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
                     <span className="text-[10px] font-medium text-slate-500 dark:text-gray-400">
@@ -986,7 +853,6 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
                     </span>
                 </div>
             </div>
-            {/* Keeping the active indicator as requested */}
             <div className={`w-2 h-2 rounded-full ${chatRoom.active ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
         </div>
 
@@ -994,7 +860,7 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
         <div 
             ref={scrollRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto p-4 pt-24 pb-4 space-y-4 custom-scrollbar"
+            className="flex-1 overflow-y-auto p-4 pt-24 pb-4 space-y-4 custom-scrollbar bg-slate-50/50 dark:bg-slate-900/50"
         >
             {messages.length === 0 && (
                 <div className="text-center text-slate-400 text-sm mt-10">No messages yet. Say hello!</div>
@@ -1005,16 +871,14 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
                 const isFile = msg.type === 'file';
                 const isAudio = msg.type === 'audio';
                 const isImage = isFile && msg.fileType?.startsWith('image/');
-                
-                // Logic: A message is seen if the other user's "last seen message" 
-                // is this message OR any message that came AFTER this one.
                 const isSeen = otherSeenIndex >= index;
 
                 return (
                     <motion.div 
                         key={msg.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
                         className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                     >
                         <div className={`max-w-[85%] md:max-w-[70%] rounded-2xl shadow-sm ${
@@ -1023,7 +887,6 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
                             : 'bg-white dark:bg-white/10 text-slate-800 dark:text-white border border-slate-200 dark:border-white/5 rounded-tl-none'
                         } ${isFile || isAudio ? 'p-1' : 'px-4 py-3'}`}>
                             
-                            {/* Render based on type */}
                             {isAudio ? (
                                 renderAudioContent(msg, isMe)
                             ) : isFile ? (
@@ -1032,8 +895,7 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
                                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
                             )}
                             
-                            {/* Footer: Timestamp & Seen Status */}
-                            {!isImage && (
+                            {!isImage && !isAudio && (
                                 <div className={`flex items-center justify-end gap-1 mt-1 mr-1 ${isMe ? 'opacity-80' : 'opacity-60'}`}>
                                     <span className={`text-[10px] ${isMe ? 'text-indigo-100' : 'text-slate-400'}`}>
                                         {msg.timestamp?.seconds 
@@ -1049,12 +911,9 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
                     </motion.div>
                 );
             })}
-            
-            {/* Scroll Anchor */}
             <div ref={messagesEndRef} />
         </div>
         
-        {/* New Messages Indicator */}
         <AnimatePresence>
             {hasNewMessages && (
                 <motion.div 
@@ -1081,59 +940,61 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project }) => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        className="absolute -top-8 left-4 text-xs text-slate-500 dark:text-gray-400 flex items-center gap-2 bg-white/80 dark:bg-slate-900/80 px-2 py-1 rounded-t-lg backdrop-blur-sm shadow-sm"
+                        className="absolute -top-8 left-4 text-xs text-slate-500 dark:text-gray-400 flex items-center gap-2 bg-white/80 dark:bg-slate-900/80 px-3 py-1.5 rounded-t-lg backdrop-blur-sm shadow-sm"
                     >
-                        <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                        </span>
-                        {otherLabel} is typing...
+                        <div className="flex gap-1 items-center">
+                            <motion.span 
+                                className="w-1.5 h-1.5 bg-primary rounded-full"
+                                animate={{ y: [0, -4, 0] }}
+                                transition={{ repeat: Infinity, duration: 0.6 }}
+                            />
+                            <motion.span 
+                                className="w-1.5 h-1.5 bg-primary rounded-full"
+                                animate={{ y: [0, -4, 0] }}
+                                transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
+                            />
+                            <motion.span 
+                                className="w-1.5 h-1.5 bg-primary rounded-full"
+                                animate={{ y: [0, -4, 0] }}
+                                transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
+                            />
+                        </div>
+                        {otherLabel} is typing
                     </motion.div>
                 )}
             </AnimatePresence>
             
-            <form onSubmit={handleSendMessage} className="flex gap-2">
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    onChange={handleFileUpload}
-                />
+            <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
+                <input type="file" ref={fileInputRef} className="hidden" onChange={() => {}} />
                 
                 <Button 
                     type="button" 
                     variant="secondary" 
-                    className="px-3 rounded-xl bg-slate-100 dark:bg-white/5 border-transparent hover:bg-slate-200 dark:hover:bg-white/10"
+                    className="px-3 h-11 w-11 rounded-xl bg-slate-100 dark:bg-white/5 border-transparent hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center shrink-0"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading || isRecording}
-                    title="Attach file"
+                    disabled={isUploading || isRecording || isSending}
                 >
-                    {isUploading ? (
-                        <Loader2 className="animate-spin text-primary" size={20} />
-                    ) : (
-                        <Paperclip size={20} className="text-slate-500 dark:text-gray-400" />
-                    )}
+                    {isUploading ? <Loader2 className="animate-spin text-primary" size={20} /> : <Paperclip size={20} className="text-slate-500 dark:text-gray-400" />}
                 </Button>
 
                 <Button 
                     type="button" 
                     variant={isRecording ? 'danger' : 'secondary'} 
-                    className={`px-3 rounded-xl border-transparent ${isRecording ? 'animate-pulse' : 'bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10'}`}
-                    onClick={isRecording ? stopRecording : startRecording}
-                    disabled={isUploading}
-                    title={isRecording ? "Stop Recording" : "Record Audio"}
+                    className={`px-3 h-11 w-11 rounded-xl border-transparent flex items-center justify-center shrink-0 ${isRecording ? 'animate-pulse' : 'bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+                    disabled={isUploading || isSending}
                 >
                     {isRecording ? <StopCircle size={20} /> : <Mic size={20} className="text-slate-500 dark:text-gray-400" />}
                 </Button>
 
                 <input
-                    className="flex-1 bg-slate-100 dark:bg-white/5 border-0 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-gray-400"
-                    placeholder={isRecording ? "Recording audio..." : "Type a message..."}
+                    className="flex-1 bg-slate-100 dark:bg-white/5 border-0 rounded-xl px-4 py-3 h-11 text-slate-900 dark:text-white focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400"
+                    placeholder={isRecording ? "Recording..." : "Type a message..."}
                     value={newMessage}
                     onChange={handleInputChange}
-                    disabled={isRecording}
+                    disabled={isRecording || isSending}
                 />
-                <Button type="submit" disabled={!newMessage.trim() || isRecording} className="px-4 rounded-xl">
+                
+                <Button type="submit" disabled={!newMessage.trim() || isRecording || isSending} className="px-4 h-11 rounded-xl shrink-0">
                     <Send size={18} />
                 </Button>
             </form>

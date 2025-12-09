@@ -10,9 +10,12 @@ import { Invoices } from './pages/Invoices';
 import { Profile } from './pages/Profile';
 import { PublicProfile } from './pages/PublicProfile';
 import { Messages } from './pages/Messages';
+import { Notifications } from './pages/Notifications';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { NotificationProvider } from './context/NotificationContext';
+import { ErrorBoundary } from './components/UI';
 
 // Component to scroll top on route change
 const ScrollToTop = () => {
@@ -27,30 +30,35 @@ const ScrollToTop = () => {
 
 const App: React.FC = () => {
   return (
-    <ThemeProvider>
-      <ToastProvider>
-        <AuthProvider>
-          <Router>
-            <ScrollToTop />
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/portfolio" element={<Portfolio />} />
-                <Route path="/u/:userId" element={<PublicProfile />} />
-                
-                {/* Protected Routes */}
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/projects" element={<Projects />} />
-                <Route path="/invoices" element={<Invoices />} />
-                <Route path="/messages" element={<Messages />} />
-                <Route path="/profile" element={<Profile />} />
-              </Routes>
-            </Layout>
-          </Router>
-        </AuthProvider>
-      </ToastProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <NotificationProvider>
+              <Router>
+                <ScrollToTop />
+                <Layout>
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/portfolio" element={<Portfolio />} />
+                    <Route path="/u/:userId" element={<PublicProfile />} />
+                    
+                    {/* Protected Routes */}
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/projects" element={<Projects />} />
+                    <Route path="/invoices" element={<Invoices />} />
+                    <Route path="/messages" element={<Messages />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/notifications" element={<Notifications />} />
+                  </Routes>
+                </Layout>
+              </Router>
+            </NotificationProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 };
 
